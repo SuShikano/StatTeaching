@@ -61,10 +61,6 @@ data.generation <- function(sample.size=100,
 }
 
 
-# just for testing...
-#temp <- data.generation()
-#summary(lm(y ~ X1 + X2,data=temp$generated.data[[2]]))
-
 
 
 

@@ -9,24 +9,75 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Loading the data.generation() function from github.
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+```{r}
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/data_generation.R")
+
+
+```
+
+## Generating two different datasets
+
+Let's generate 2 different datasets (n.sim=2) with the sample size of 500 (sample.size=500) and with the true regression model with 
+only one independent variable (n.iv=1) whose mean is 3 (x.mu=3) and variance is 1 (x.Sigma=as.matrix(1,nrow=1)). The true regression model has the parameter value 1 for the intercept and 5 for the slope (para=c(1,5)). Its error has the uniform distribution (err.dist = "uniform"") with the range of 20 centered on 0 (err.disp = 20).
 
 ```{r}
 
+samples01 <- data.generation(sample.size=100,
+                                  n.sim=2,
+                                  n.iv=1,
+                             x.mu=3,
+                             x.Sigma=as.matrix(1,nrow=1),
+                             para=c(1,5),
+                             err.dist = "uniform",
+                             err.disp = 20)
+```
 
+## Describing the generated data
+
+The first generated data:
+
+```{r}
+head(samples01$generated.data[[1]])
+```
+
+
+... and the second generated data:
+
+```{r}
+head(samples01$generated.data[[2]])
+```
+
+You can also plot y and x1 of both datasets:
+
+```{r}
+par(mfrow=c(1,2))
+
+for (i.fig in 1:2){
+  plot(samples01$generated.data[[i.fig]]$y ~ samples01$generated.data[[i.fig]]$X1,
+       xlab="X1",ylab="y",
+       main=paste("generated data",i.fig)
+       )
+}
+```
+
+
+## Regressing y on X1.
+
+```{r}
+
+for (i in 1:2){
+  print(paste("Generated data",i))
+  print(
+    summary(
+      lm(y ~ X1, data=samples01$generated.data[[i]])
+    )
+  )
+}
 
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
