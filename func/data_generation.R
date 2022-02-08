@@ -26,9 +26,10 @@ data.generation <- function(sample.size=100,
                             
 ){
   
-  if (length(x.mu)!=n.iv ) stop("Check the length of x.mu and n.iv")
-  if (nrow(x.Sigma)!=n.iv| ncol(x.Sigma)!=n.iv ) stop("Check the dimensionality of x.Sigma and the length of n.iv")
-  if (length(para) != (n.iv+1)) stop("Check the length of para and n.iv")
+  if (length(x.mu)!=n.iv ) stop("Check the length of x.mu and n.iv.")
+  if (!is.matrix(x.Sigma)) stop("x.Sigma has to be a matrix.")
+  if (nrow(x.Sigma)!=n.iv| ncol(x.Sigma)!=n.iv ) stop("Check the dimensionality of x.Sigma and the length of n.iv.")
+  if (length(para) != (n.iv+1)) stop("Check the length of para and n.iv.")
   
   library(MASS)
   if (!is.null(random.seed)) set.seed(1234)  
