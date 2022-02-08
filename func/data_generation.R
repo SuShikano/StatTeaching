@@ -8,8 +8,9 @@
 #' @param x.Sigma
 #' @param random.seed 
 #' @param para
-#' @param err.dist
-#' @param err.disp
+#' @param err.dist Specifies the distribution form of the errors. Possible values are 
+#' "normal" (default) and "uniform".
+#' @param err.disp 
 #' @return 
 # ---------------------------------------------------------------------------- #
 
@@ -21,7 +22,7 @@ data.generation <- function(sample.size=100,
                             random.seed = NULL,
                             para = c(10,4,-5),
                             err.dist = "normal",
-                            err.disp = 30
+                            err.disp = 25
                             
 ){
   
@@ -34,7 +35,7 @@ data.generation <- function(sample.size=100,
   generated.data <- vector(mode = "list", length = n.sim)
   
   for (i.sim in 1:n.sim){
-    X <- mvrnorm(sample.size, mu=c(50,200), Sigma=covmat) 
+    X <- mvrnorm(sample.size, mu=x.mu, Sigma=x.Sigma) 
     colnames(X) <- paste0("X",1:n.iv)
     if (err.dist=="normal") error <- rnorm(sample.size,0,err.disp)
     if (err.dist=="uniform") error <- runif(sample.size,err.disp*(-.5),err.disp*(.5))
@@ -54,23 +55,15 @@ data.generation <- function(sample.size=100,
                    x.Sigma = x.Sigma,
                    random.seed = random.seed,
                    para = para,
-                   err.var = err.var,
+                   err.dist = err.dist,
+                   err.disp = err.disp,
                    generated.data = generated.data)
 }
 
 
-
-
-
-
-
-temp <- data.generation()
-
-
-
-
-
-summary(lm(y ~ X1 + X2,data=temp$generated.data[[2]]))
+# just for testing...
+#temp <- data.generation()
+#summary(lm(y ~ X1 + X2,data=temp$generated.data[[2]]))
 
 
 
