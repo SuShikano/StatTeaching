@@ -32,7 +32,7 @@ data.generation <- function(sample.size=100,
   if (length(para) != (n.iv+1)) stop("Check the length of para and n.iv.")
   
   library(MASS)
-  if (!is.null(random.seed)) set.seed(1234)  
+  if (!is.null(random.seed)) set.seed(random.seed)  
   generated.data <- vector(mode = "list", length = n.sim)
   
   for (i.sim in 1:n.sim){
