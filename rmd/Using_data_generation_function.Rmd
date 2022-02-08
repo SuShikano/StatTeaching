@@ -1,7 +1,7 @@
 ---
 title: "Using the data.generation function"
 author: "Susumu Shikano"
-date: "8 Februar 2022"
+date: "Februar 2022"
 output: html_document
 ---
 
@@ -66,6 +66,8 @@ for (i.fig in 1:2){
 
 ## Regressing y on X1.
 
+By using each of the datasets, we can regress y on X1. As one can see below, both results are not identical with the true model $\hat y = 1 + 5 \times X1$.
+
 ```{r}
 
 for (i in 1:2){
@@ -79,5 +81,61 @@ for (i in 1:2){
 
 ```
 
+## Checking the performance of the regression models using 1000 datasets
+
+We generate 1000 datasets (n.sim=1000) based on the same set-up above.
+
+```{r}
+
+samples02 <- data.generation(sample.size=100,
+                                  n.sim=1000,
+                                  n.iv=1,
+                             x.mu=3,
+                             x.Sigma=as.matrix(1,nrow=1),
+                             para=c(1,5),
+                             err.dist = "uniform",
+                             err.disp = 20)
 
 
+```
+
+Using each of the generated datasets, we regress y on X1 and collect the results:
+
+
+```{r}
+
+all.intercepts <- all.slopes <- matrix(NA,nrow=1000,ncol=4)
+for(i.data in 1:1000){
+  this.result <-     
+     summary(lm(y ~ X1, 
+                data=samples02$generated.data[[i.data]]))$coefficients
+  all.intercepts[i.data,] <- this.result[1,]
+  all.slopes[i.data,] <- this.result[2,]
+} 
+
+
+```
+
+Let's check the distribution of the point estimates.
+
+```{r}
+
+par(mfrow=c(1,2))
+for (i.fig in 1:2){
+  if (i.fig==1) to.plot <- all.intercepts[,1]
+  if (i.fig==2) to.plot <- all.slopes[,1]
+  
+  hist(to.plot,
+       main=c("intercept","slope")[i.fig],
+       xlab="Estimates",
+       freq=F)
+  legend("topright",
+         paste("mean",round(mean(to.plot),2)),
+         bty="n")
+  
+}
+
+
+```
+
+The means of the estimates are very close to the true value. If you use infinitely large number of datasets, the means are identical with the true value (no bias).
