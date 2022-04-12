@@ -1,7 +1,7 @@
 ---
 title: "Using the data.generation function"
 author: "Susumu Shikano"
-date: "Feb 2022"
+date: "Last compiled on `r format(Sys.Date(), '%d. %B %Y')`"
 output: html_document
 ---
 
@@ -9,8 +9,9 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Loading the data.generation() function from github.
+## Loading the function from github.
 
+We first load the function, which is used to generate multiple datasets under certain assumptions.
 
 ```{r}
 source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/data_generation.R")
@@ -183,7 +184,7 @@ legend("topleft",
 
 The black line is the true regression line, around which the grey estimated regression lines based on the random samples can be found.
 
-Let's check the confidence intervals of the slope estimates:
+Let's check the 95% confidence intervals of the slope estimates:
 
 ```{r fig.height = 6, fig.width = 4, fig.align = "center"}
 ci.prob <- .95
