@@ -1,0 +1,207 @@
+---
+title: 'An example regression analysis (Data: Official Results of the
+  2021 German Federal Election)'
+author: "Susumu Shikano"
+date: "Last compiled at `r format(Sys.Date(), '%d. %B %Y')`"
+output: html_document
+---
+
+## Preparing data
+
+We download the official results of 2021 German Federal Election. 
+
+```{r, echo = TRUE}
+
+library(foreign)
+
+url.result <- "https://www.bundeswahlleiter.de/dam/jcr/fc2afe29-c086-43eb-bc34-a48356dee154/btw21_kerg.csv"
+# reading the results
+rawdata <- read.csv(url.result,
+                    skip=5,sep=";",header = FALSE,encoding="UTF-8")
+
+# reading the labels
+main.labels <- read.csv(url.result,
+                        skip=2,nrows=1,sep=";",header = FALSE,
+                        colClasses = "character",encoding="UTF-8")
+
+# reading the second line of the labels
+first.second.votes <- read.csv(url.result,
+                               skip=3,nrows=1,sep=";",header = FALSE)
+
+first.second.votes[1:3] <- "aaa" 
+
+# delete previous results and state-level results
+result21 <- rawdata[,!is.na(first.second.votes)]
+result21 <- result21[result21[,3]!=99 & !is.na(result21[,3]),]
+
+# make the labels
+main.labels <- main.labels[!is.na(first.second.votes)]
+main.labels[seq(5,length(main.labels),by=2)] <-    main.labels[seq(4,length(main.labels)-1,by=2)] # adding the label for SMD and PR votes
+
+main.labels <- paste(main.labels,first.second.votes[!is.na(first.second.votes)])
+main.labels <- gsub("aaa","",main.labels)
+
+main.labels <- gsub("ä","ae",main.labels)
+main.labels <- gsub("Ä","Ae",main.labels)
+main.labels <- gsub("ö","oe",main.labels)
+main.labels <- gsub("Ö","Oe",main.labels)
+main.labels <- gsub("ü","ue",main.labels)
+main.labels <- gsub("Ü","Ue",main.labels)
+
+colnames(result21) <- main.labels
+
+```
+
+After data cleaning, the dataset contains 299 electoral districts as unit.
+
+We further download socio-demographic data for the districts.
+
+```{r, echo = TRUE}
+
+url.sociodem <- "https://www.bundeswahlleiter.de/dam/jcr/b1d3fc4f-17eb-455f-a01c-a0bf32135c5d/btw21_strukturdaten.csv"
+rawdata <- read.csv(url.sociodem,
+                    skip=8,sep=";",dec = ",",
+                    header = TRUE,encoding="UTF-8")
+
+# delete the state-level results
+sociodem <- rawdata[rawdata[,2]<500,]
+
+```
+
+## Obtaining variables as vectors
+
+- old.gen: percentage of the older generation (age 60+)
+- gdp: GDP per capita
+- eligible: number of eligible citizens to vote
+- valid: number of valid votes
+- tunrout: turnout rate (in %)
+- union.pr: vote share of CDU/CSU (in %)
+
+```{r, echo = TRUE}
+
+gdp <- sociodem[,grep("Bruttoinlandsprodukt",names(sociodem))]
+old.gen <- sociodem[,grep("Alter",names(sociodem))]
+old.gen <- old.gen[,5] + old.gen[,6]
+
+eligible <- result21[,grep("Wahlberechtigte Zweitstimmen",names(result21))]
+valid <- result21[,grep("Gueltige Stimmen Zweitstimmen",names(result21))]
+
+turnout <- valid *100/ eligible
+
+cdu.pr <- result21[,grep("Christlich Demokratische Union Deutschlands Zweitstimmen",names(result21))]
+
+csu.pr <- result21[,grep("Christlich-Soziale Union in Bayern e.V. Zweitstimmen",names(result21))]
+
+union.pr <- cdu.pr
+union.pr[is.na(union.pr)] <- csu.pr[is.na(union.pr)]
+
+union.pr <- union.pr*100/valid
+
+
+```
+
+## Joint distributions
+
+We observe two joint distributions:
+
+```{r, echo = TRUE}
+
+par(mfrow=c(1,2))
+plot(gdp,turnout,xlab="GDP per capita",ylab="Turnout (%)")
+plot(old.gen,union.pr,xlab="Age 60+ (%)",ylab="CDU/CSU (%)")
+
+```
+
+
+## Variances and covariances
+
+```{r, echo = TRUE}
+cov(cbind(gdp,old.gen,turnout,union.pr))
+```
+
+The diagonal elements are variances. The off-diagonal elements are covariances. Here, you have to be able to calculate the slope of the regression lines. Calculate the regression slopes (Turnout on GDP and CDU/CSU on older generation).
+
+## Calculating the regression slopes
+
+To obtain the regression slope, we can divide covariance of the dependent and independent variable by the variance of independent variable. We now estimate the slop for the following regression model:
+
+- turnout = $\beta_0$ + $\beta_1$ gdp + u
+```{r, echo = TRUE}
+cov(turnout,gdp)/var(gdp)
+```
+
+- union.pr = $\beta_0$ + $\beta_1$ old.gen + u
+```{r, echo = TRUE}
+cov(union.pr,old.gen)/var(old.gen)
+```
+
+## Simple regression models (Turnout on GDP)
+
+```{r, echo = TRUE}
+lm.out.1 <- lm(turnout ~ gdp)
+summary(lm.out.1)
+```
+You can check whether your hand-calculated regression slope corresponds to the output.
+
+## Simple regression models (Vote for CDU/CSU on age 60+)
+
+```{r, echo = TRUE}
+lm.out.2 <- lm(union.pr ~ old.gen)
+summary(lm.out.2)
+```
+
+## Simple regression models (graphical presentation)
+
+```{r, echo = TRUE}
+par(mfrow=c(1,2))
+plot(gdp,turnout,xlab="GDP per capita",ylab="Turnout (%)")
+abline(lm.out.1)
+plot(old.gen,union.pr,xlab="Age 60+ (%)",ylab="CDU/CSU (%)")
+abline(lm.out.2)
+```
+
+## Estimating variances of errors and OLS estimates
+
+```{r, echo = TRUE}
+SSR <- sum(lm.out.1$residuals^2) # residual square sum
+sigma2.hat <- SSR/lm.out.1$df.residual # estimated variance of errors
+
+SST.x <- sum((gdp-mean(gdp))^2) # total square sum of X (GDP)
+
+sigma2.beta1 <- sigma2.hat/SST.x 
+sqrt(sigma2.beta1) # standard error of beta_1
+```
+
+Check this result with the output above (the first one). After that, calculate the standard error of the slope of the second model for yourself!
+
+
+## Regression parameters as random parameters
+
+We randomly sample 100 districts from 299 all districts and draw the regression line. This is repeated for 1000 times.
+
+```{r, echo = TRUE}
+n.iter <- 1000
+sample.size <- 100
+
+estimates <- matrix(NA,ncol=2,nrow=n.iter)
+plot(old.gen,union.pr,xlab="Age 60+ (%)",ylab="CDU/CSU (%)")
+for (i in 1:n.iter){
+  this.sample <- sample(1:length(union.pr),size = sample.size)
+  this.lm.out <- lm(union.pr[this.sample] ~ old.gen[this.sample])
+  estimates[i,] <- coefficients(this.lm.out)
+  abline(this.lm.out,col="grey")
+}
+```
+
+We can observe the distribution of slopes based on 1000 samples.
+
+```{r, echo = TRUE}
+hist(estimates[,2],xlab="Slope",main="")
+```
+
+The mean of this distribution is `r round(mean(estimates[,2]),4)`.
+
+
+
+
+

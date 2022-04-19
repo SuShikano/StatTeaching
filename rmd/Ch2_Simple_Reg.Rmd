@@ -1,0 +1,171 @@
+---
+title: "Chapter 2: Simple Regression Model"
+author: "Susumu Shikano"
+date: "Last compiled at `r format(Sys.Date(), '%d. %B %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# loading some functions
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/data_generation.R")
+
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/ci_sample_mean.R")
+
+
+# setting some parameters
+
+num.datasets <- 5000 # number of datasets
+sample.size <- 500
+
+true.slope <- 5
+true.intercept <- 1
+```
+
+
+## Simple Regression under the GM-assumptions
+
+We generate `r num.datasets` datasets with n=`r sample.size` under the GM-assumptions. The true regression line has the intercept of `r true.intercept` and the slope of `r true.slope`.
+
+```{r}
+
+GM.samples <- data.generation(sample.size=sample.size,
+                             n.sim=num.datasets,
+                             n.iv=1,
+                             x.mu=3,
+                             x.Sigma=as.matrix(1,nrow=1),
+                             para=c(true.intercept,true.slope),
+                             err.dist = "normal",
+                             err.disp = 10)
+```
+
+## Describing a generated dataset and checking the zero conditional mean assumption
+
+The first generated dataset looks as follows:
+
+```{r}
+data.1 <- GM.samples$generated.data[[1]]
+
+plot(data.1$y ~ data.1$X1,ylab="y",xlab="x")
+abline(coef=GM.samples$para)
+
+```
+
+The line through the data is the true regression line, based on which the dataset was generated. By subtracting the true y from the observed y, we can obtain errors (which has been stored during the data generation above):
+
+```{r}
+y.range <- range(data.1$error)
+x.range <- range(data.1$X1)
+
+plot(data.1$error ~ data.1$X1,ylab="Errors",xlab="x",
+     xlim=x.range,ylim=y.range)
+
+
+
+```
+
+We can now check whether this satisfies the zero conditional mean assumption. For this purpose, the mean residuals are calculated for different x values:
+
+```{r}
+y.range <- range(data.1$error)
+x.range <- range(data.1$X1)
+
+plot(data.1$error ~ data.1$X1,ylab="Residuals",xlab="x",
+     xlim=x.range,ylim=y.range)
+
+x.values <- seq(min(data.1$X1),max(data.1$X1),length=25)
+x.interval <- x.values[2] -x.values[1]
+
+conditional.mean <- lower.b <- upper.b <- rep(NA,length(x.values))
+for (i in 1:length(conditional.mean)){
+  
+  selected.error <- data.1$error[(data.1$X1>(x.values[i]-x.interval)) & 
+                                             (data.1$X1<(x.values[i]+x.interval)) ]
+  conditional.mean[i] <- mean(selected.error)
+  this.ci <- ci.sample.mean(selected.error)
+  lower.b[i] <- this.ci$lower.b
+  upper.b[i] <- this.ci$upper.b
+  
+}
+
+par(new=T)
+plot(conditional.mean ~ x.values,ann=F,axes=F,
+     xlim=x.range,ylim=y.range,
+     col="red",pch=19,type="b")
+abline(h=0,lty=2,lwd=3)
+for (i in 1:length(conditional.mean)){
+  lines(rep(x.values[i],2),c(upper.b[i],lower.b[i]),col="red",lwd=2)
+}
+
+
+```
+
+The red dots are the mean residuals conditional to different x values. For each dots, their 95% confidence intervals are built since the data here is a random sample (the red vertical lines). The confidence intervals include the zero (the horizontal dotted lines), which indicates that we cannot reject the null hypothesis that the conditional mean is zero. 
+
+For very small and large x values, we tend to have larger deviations from zero, however, with large confidence intervals. These estimates are uncertain due to the small sample size in these areas.
+
+## The estimates of regression coefficients based on the first generated dataset
+
+We estimate the regression line based on the first generated dataset:
+
+```{r}
+lm.out <- lm(y ~ X1,data=data.1)
+summary(lm.out)
+```
+
+We plot the estimated regression line in the joint distribution of y and x.
+
+```{r}
+plot(data.1$y ~ data.1$X1,ylab="y",xlab="x")
+abline(reg=lm.out,col="red")
+
+abline(coef=GM.samples$para)
+
+legend("bottomright",
+       lty=1,
+       col=c("red","black"),
+       c("Estimated","True"),
+       bty="n")
+```
+
+The red line is the estimated regression line, while the black line is the true regression line. Both lines are similar, but slightly different due to random sampling.  
+
+
+
+## Distribution of the estimates of regression coefficients
+
+
+We estimate the simple regression model by using each of `r num.datasets` datasets:
+
+```{r}
+
+all.coef <- matrix(NA,nrow=num.datasets,ncol=3)
+
+for (i in 1:num.datasets){
+    this.data <- GM.samples$generated.data[[i]]
+
+    lm.out <- lm(y ~ X1,data=  this.data)
+
+    all.coef[i,1:2] <- coef(lm.out)
+    all.coef[i,3] <- summary(lm.out)$sigma
+}
+colnames(all.coef) <- c("b0","b1","sigma")
+
+
+
+```
+
+
+Below you will find the distribution of the estimated regression coefficients:
+
+
+```{r}
+
+hist(all.coef[,"b1"],main="",xlab="Regression coefficients")
+
+```
+
+
+The mean value of this distribution is `r round(mean(all.coef[,"b1"]),3)`. This is almost identical with the true parameter value. And if we increase the number of generated datasets, we will obtain the identical value with the truth, which means unbiasedness.
+
