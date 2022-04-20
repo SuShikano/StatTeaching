@@ -6,6 +6,15 @@ date: "Last compiled at `r format(Sys.Date(), '%d. %B %Y')`"
 output: html_document
 ---
 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# loading some functions
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/ci_sample_mean.R")
+
+```
+
 ## Preparing data
 
 We download the official results of 2021 German Federal Election. 
@@ -160,24 +169,10 @@ plot(old.gen,union.pr,xlab="Age 60+ (%)",ylab="CDU/CSU (%)")
 abline(lm.out.2)
 ```
 
-## Estimating variances of errors and OLS estimates
-
-```{r, echo = TRUE}
-SSR <- sum(lm.out.1$residuals^2) # residual square sum
-sigma2.hat <- SSR/lm.out.1$df.residual # estimated variance of errors
-
-SST.x <- sum((gdp-mean(gdp))^2) # total square sum of X (GDP)
-
-sigma2.beta1 <- sigma2.hat/SST.x 
-sqrt(sigma2.beta1) # standard error of beta_1
-```
-
-Check this result with the output above (the first one). After that, calculate the standard error of the slope of the second model for yourself!
-
 
 ## Regression parameters as random parameters
 
-We randomly sample 100 districts from 299 all districts and draw the regression line. This is repeated for 1000 times.
+Now, we change the perspective and treat our data as population, from which we draw random samples. More concretely, we randomly sample 100 districts from 299 all districts and draw the regression line. This is repeated for 1000 times.
 
 ```{r, echo = TRUE}
 n.iter <- 1000
@@ -201,7 +196,145 @@ hist(estimates[,2],xlab="Slope",main="")
 
 The mean of this distribution is `r round(mean(estimates[,2]),4)`.
 
+This estimator (estimand: the regression line based on all 299 districts) is likely to be biased due to the violation of the zero conditional mean assumption.
 
 
+To see this, we can check the joint distribution of the errors and the independent variable (Age 60+).
 
+```{r, echo = TRUE}
+par(mfrow=c(1,2))
+plot(old.gen,union.pr,xlab="Age 60+ (%)",ylab="CDU/CSU (%)")
+abline(lm.out.2)
+
+errors <- lm.out.2$residuals
+
+plot(old.gen,errors,xlab="Age 60+ (%)",ylab="Errors")
+abline(h=0)
+
+
+```
+
+If we calculate the mean errors for different x values, it is clearly to see that the estimated regression line tends to over-predict the CDU/CSU share for the districts with about 25% and those with 35% or more.  
+
+```{r}
+y.range <- range(errors)
+x.range <- range(old.gen)
+
+plot(errors ~ old.gen,ylab="Errors",xlab="Age 60+",
+     xlim=x.range,ylim=y.range)
+
+x.values <- seq(min(old.gen),max(old.gen),length=25)
+x.interval <- x.values[2] -x.values[1]
+
+conditional.mean <- lower.b <- upper.b <- rep(NA,length(x.values))
+for (i in 1:length(conditional.mean)){
+  
+  selected.error <- errors[(old.gen>(x.values[i]-x.interval)) & 
+                                             (old.gen<(x.values[i]+x.interval)) ]
+  conditional.mean[i] <- mean(selected.error)
+  this.ci <- ci.sample.mean(selected.error)
+  lower.b[i] <- this.ci$lower.b
+  upper.b[i] <- this.ci$upper.b
+  
+}
+
+par(new=T)
+plot(conditional.mean ~ x.values,ann=F,axes=F,
+     xlim=x.range,ylim=y.range,
+     col="red",pch=19,type="b")
+abline(h=0,lty=2,lwd=3)
+for (i in 1:length(conditional.mean)){
+  lines(rep(x.values[i],2),c(upper.b[i],lower.b[i]),col="red",lwd=2)
+}
+
+
+```
+
+
+Furthermore, the homoscedasticity assumption seems to be violated, as well. The red points in the below figure show the standard deviations of the errors for different x values with their 95%-confidence intervals (vertical red lines). Accordingly, the error variance is larger for smaller x values.
+
+
+```{r}
+y.range <- range(errors)
+x.range <- range(old.gen)
+
+plot(errors ~ old.gen,ylab="Errors",xlab="Age 60+",
+     xlim=x.range,ylim=y.range)
+
+x.values <- seq(min(old.gen),max(old.gen),length=25)
+x.interval <- x.values[2] -x.values[1]
+
+conditional.sd <- lower.b <- upper.b <- rep(NA,length(x.values))
+for (i in 1:length(conditional.sd)){
+  
+  selected.error <- errors[(old.gen>(x.values[i]-x.interval)) & 
+                                             (old.gen<(x.values[i]+x.interval)) ]
+  conditional.sd[i] <- sd(selected.error)
+  
+  dof <- length(selected.error)-1
+  
+  lower.b[i] <- sqrt(conditional.sd[i]^2*dof/qchisq(0.975,df=dof))
+  upper.b[i] <- sqrt(conditional.sd[i]^2*dof/qchisq(0.025,df=dof))
+  
+}
+
+par(new=T)
+plot(conditional.sd ~ x.values,ann=F,axes=F,
+     xlim=x.range,ylim=y.range,
+     col="red",pch=19,type="b")
+abline(h=0,lty=2,lwd=3)
+for (i in 1:length(conditional.sd)){
+  lines(rep(x.values[i],2),c(upper.b[i],lower.b[i]),col="red",lwd=2)
+}
+
+
+```
+
+## Variance decomposition and Goodness of Fit
+
+To discuss the variance decomposition and goodness of fit, we come back to the first regression model:
+
+```{r}
+summary(lm.out.1)
+
+plot(gdp,turnout,xlab="GDP per capita",ylab="Turnout (%)")
+abline(lm.out.1)
+
+```
+
+Based on the regression result above, we can calculate the following three sum of squares
+
+```{r}
+
+SST <- mean((turnout - mean(turnout))^2)
+SST
+
+SSE <- mean((lm.out.1$fitted.values - mean(turnout))^2)
+SSE
+
+SSR <- mean((lm.out.1$residuals )^2)
+SSR
+
+r.squared <- SSE/SST
+r.squared
+```
+
+Obviously, the total sum of squares of y can be decomposed to SSE and SSR. And the share of SSE in SST is the r-squared, which is a goodness of fit measure of the model.
+
+## Estimating variances of errors and OLS estimates
+
+```{r, echo = TRUE}
+SSR <- sum(lm.out.1$residuals^2) # residual square sum
+sigma2.hat <- SSR/lm.out.1$df.residual # estimated variance of errors
+
+lm.out.1$df.residual
+sqrt(sigma2.hat)
+
+SST.x <- sum((gdp-mean(gdp))^2) # total square sum of X (GDP)
+
+sigma2.beta1 <- sigma2.hat/SST.x 
+sqrt(sigma2.beta1) # standard error of beta_1
+```
+
+Check this result with the output above. 
 

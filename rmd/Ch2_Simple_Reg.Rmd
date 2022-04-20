@@ -13,6 +13,19 @@ source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/data_
 
 source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/ci_sample_mean.R")
 
+# defining some functions
+simple.var <- function(x){
+  diff.to.mean <- x - mean(x)
+  squared.diff <- diff.to.mean^2
+  output <- mean(squared.diff)
+  output
+}
+
+simple.cov <- function(x,y){
+  mean((x - mean(x))*(y - mean(y)))
+}
+
+
 
 # setting some parameters
 
@@ -21,12 +34,13 @@ sample.size <- 500
 
 true.slope <- 5
 true.intercept <- 1
+true.err.var <- 100
 ```
 
 
 ## Simple Regression under the GM-assumptions
 
-We generate `r num.datasets` datasets with n=`r sample.size` under the GM-assumptions. The true regression line has the intercept of `r true.intercept` and the slope of `r true.slope`.
+We generate `r num.datasets` datasets with n=`r sample.size` under the GM-assumptions. The true regression line has the intercept of `r true.intercept` and the slope of `r true.slope`. The variance of the error is `r true.err.var`.
 
 ```{r}
 
@@ -37,7 +51,7 @@ GM.samples <- data.generation(sample.size=sample.size,
                              x.Sigma=as.matrix(1,nrow=1),
                              para=c(true.intercept,true.slope),
                              err.dist = "normal",
-                             err.disp = 10)
+                             err.disp = true.err.var)
 ```
 
 ## Describing a generated dataset and checking the zero conditional mean assumption
@@ -71,7 +85,7 @@ We can now check whether this satisfies the zero conditional mean assumption. Fo
 y.range <- range(data.1$error)
 x.range <- range(data.1$X1)
 
-plot(data.1$error ~ data.1$X1,ylab="Residuals",xlab="x",
+plot(data.1$error ~ data.1$X1,ylab="Errors",xlab="x",
      xlim=x.range,ylim=y.range)
 
 x.values <- seq(min(data.1$X1),max(data.1$X1),length=25)
@@ -168,4 +182,108 @@ hist(all.coef[,"b1"],main="",xlab="Regression coefficients")
 
 
 The mean value of this distribution is `r round(mean(all.coef[,"b1"]),3)`. This is almost identical with the true parameter value. And if we increase the number of generated datasets, we will obtain the identical value with the truth, which means unbiasedness.
+
+
+## Uncerntaity of the estimate
+
+As seen above, the estimates of regression coefficients have uncertainty, which can be measured by variance. The above distribution has variance of `r round(mean((all.coef[,"b1"] - mean(all.coef[,"b1"]))^2) ,3)`. 
+
+
+This value cannot be obtained from a single dataset, but can be estimated: $$Var(\hat{\beta}_1) = \frac{\sigma^2}{SST_x} = \frac{\sigma^2}{\sum_i(x_i - \bar{x})^2}$$. 
+
+```{r}
+
+all.var.estimate <- matrix(NA,nrow=num.datasets,ncol=3)
+
+for (i in 1:num.datasets){
+    this.data <- GM.samples$generated.data[[i]]
+
+    this.SST <- sum((this.data$X1 - mean(this.data$X1))^2)
+
+    all.var.estimate[i,1] <- true.err.var
+    all.var.estimate[i,2] <- this.SST
+    all.var.estimate[i,3] <- true.err.var/this.SST
+}
+colnames(all.var.estimate) <- c("sigma","SST","var.beta")
+
+
+hist(all.var.estimate[,"var.beta"],main="",xlab="Estimated variance of beta_1")
+
+
+```
+
+This distribution's expected value is `r round(mean(all.var.estimate[,"var.beta"]),3)`, which corresponds to the above variance. 
+
+
+The problem of this approach is that we do not know the true value of error variance in most situations. Therefore, we have to estimate the error variance. For this purpose, we can utilize the residuals, which come from the observed data and the estimated regression line. However, their variance is a biased estimator of the error variance.
+
+```{r}
+
+
+all.error.estimate <- rep(NA,num.datasets)
+
+for (i in 1:num.datasets){
+    this.data <- GM.samples$generated.data[[i]]
+
+    lm.out <- lm(y ~ X1,data=  this.data)
+
+    all.error.estimate[i] <- simple.var(lm.out$residuals)
+}
+
+
+hist(all.error.estimate,main="",xlab="Estimated variance")
+
+
+```
+The above distribution's expected value is `r round(mean(all.error.estimate),4)`. This is similar to the true error variance `r true.err.var`, but it will not converge to the true value even though we increase the number of simulated datasets.
+
+Fortunately, we have the unbiased estimator for the error variance: $$\hat{\sigma}^2 = \frac{1}{n-2} \sum_i \hat{u}_i^2$$ We divide by n-2 instead of n since the residuals have only n-2 degrees of freedom. In other words, if n-2 residuals are determined, the last 2 have to be automatically determined due to the restrictions in OLS: $$\sum_i \hat{u}_i = 0$$ and $$\sum_i x_i \hat{u}_i = 0$$
+
+
+```{r}
+
+
+all.error.estimate.unbiased <- all.error.estimate*sample.size/(sample.size-2)
+
+hist(all.error.estimate.unbiased,main="",xlab="Estimated variance (unbiased)")
+
+
+```
+
+This distribution's expected value is `r round(mean(all.error.estimate.unbiased),4)`. Obviously, it is closer to the true error variance.
+
+## Homoskedasticity and heteroskedasticity
+
+It has to be noted that the variance of OLS estimates above works only under all five GM assumptions, while OLS is garanteed to be the unbiased estimator under the first four GM assumptions (i.e. without homoskedasticity). 
+
+
+By using the data.generation function, we can also generate multiple datasets without the homoscedasticity assumption.
+
+```{r}
+
+het.samples <- data.generation(sample.size=sample.size,
+                             n.sim=num.datasets,
+                             n.iv=1,
+                             x.mu=3,
+                             x.Sigma=as.matrix(1,nrow=1),
+                             para=c(true.intercept,true.slope),
+                             err.dist = "normal",
+                             err.disp = true.err.var,
+                             het=TRUE,
+                             het.delta = c(0.5,0.5))
+```
+
+
+The first generated dataset looks as follows:
+
+```{r}
+data.1 <- het.samples$generated.data[[1]]
+
+plot(data.1$y ~ data.1$X1,ylab="y",xlab="x")
+abline(coef=het.samples$para)
+
+```
+
+It is clearly to see that the errors are larger for larger x values, and vice versa.  
+
 
