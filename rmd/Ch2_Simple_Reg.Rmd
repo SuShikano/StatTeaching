@@ -13,17 +13,9 @@ source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/data_
 
 source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/ci_sample_mean.R")
 
-# defining some functions
-simple.var <- function(x){
-  diff.to.mean <- x - mean(x)
-  squared.diff <- diff.to.mean^2
-  output <- mean(squared.diff)
-  output
-}
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/naive_var.R")
 
-simple.cov <- function(x,y){
-  mean((x - mean(x))*(y - mean(y)))
-}
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/naive_cov.R")
 
 
 
@@ -227,7 +219,7 @@ for (i in 1:num.datasets){
 
     lm.out <- lm(y ~ X1,data=  this.data)
 
-    all.error.estimate[i] <- simple.var(lm.out$residuals)
+    all.error.estimate[i] <- naive.var(lm.out$residuals)
 }
 
 
