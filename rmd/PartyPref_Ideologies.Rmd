@@ -272,3 +272,139 @@ naive.cov(long.data$skalo, long.data$lr.dist.sqr)
 cor(long.data$skalo, long.data$lr.dist.sqr)
 ```
 
+
+## Central limit theorem
+
+We can check the population distribution: 
+
+```{r, echo = TRUE}
+
+pop <- long.data$skalo.true
+pop.mean <- mean(pop)
+pop.var <- mean((pop-pop.mean)^2)
+
+hist(pop,freq=F)
+```
+
+The distribution is bimodal and strongly skewed.
+
+
+Now, from this population, we can draw multiple samples with size of 2, calculate the sample sum and observe its distribution.
+
+```{r, echo = TRUE}
+n.iter <- 1000
+sample.size <- 2
+all.sample.sum <- rep(NA,n.iter)
+for (i in 1:n.iter){
+  this.sample <- sample(pop,size=sample.size)
+  this.sample.sum <- sum(this.sample)
+  all.sample.sum[i] <- this.sample.sum
+}
+
+plot(density(all.sample.sum),
+     main=paste0("Sum of the random draws (n=",sample.size,")"))
+mean(all.sample.sum)
+var(all.sample.sum)
+
+```
+
+From this population, we can draw multiple samples with size of 10, calculate the sample sum and observe its distribution.
+
+```{r, echo = TRUE}
+n.iter <- 1000
+sample.size <- 10
+all.sample.sum <- rep(NA,n.iter)
+for (i in 1:n.iter){
+  this.sample <- sample(pop,size=sample.size)
+  this.sample.sum <- sum(this.sample)
+  all.sample.sum[i] <- this.sample.sum
+}
+
+plot(density(all.sample.sum),
+     main=paste0("Sum of the random draws (n=",sample.size,")"))
+mean(all.sample.sum)
+var(all.sample.sum)
+
+```
+
+From this population, we can draw multiple samples with size of 30, calculate the sample sum and observe its distribution.
+
+```{r, echo = TRUE}
+n.iter <- 1000
+sample.size <- 30
+all.sample.sum <- rep(NA,n.iter)
+for (i in 1:n.iter){
+  this.sample <- sample(pop,size=sample.size)
+  this.sample.sum <- sum(this.sample)
+  all.sample.sum[i] <- this.sample.sum
+}
+
+plot(density(all.sample.sum),
+     main=paste0("Sum of the random draws (n=",sample.size,")"))
+mean(all.sample.sum)
+var(all.sample.sum)
+```
+
+From the population, we can draw multiple samples with size of 50, calculate the sample sum and observe its distribution.
+
+```{r, echo = TRUE}
+n.iter <- 1000
+sample.size <- 50
+all.sample.sum <- rep(NA,n.iter)
+for (i in 1:n.iter){
+  this.sample <- sample(pop,size=sample.size)
+  this.sample.sum <- sum(this.sample)
+  all.sample.sum[i] <- this.sample.sum
+}
+
+plot(density(all.sample.sum),
+     main=paste0("Sum of the random draws (n=",sample.size,")"))
+mean(all.sample.sum)
+var(all.sample.sum)
+```
+
+
+From the population, we can draw multiple samples with size of 100, calculate the sample sum and observe its distribution.
+
+```{r, echo = TRUE}
+n.iter <- 1000
+sample.size <- 100
+all.sample.sum <- rep(NA,n.iter)
+for (i in 1:n.iter){
+  this.sample <- sample(pop,size=sample.size)
+  this.sample.sum <- sum(this.sample)
+  all.sample.sum[i] <- this.sample.sum
+}
+
+plot(density(all.sample.sum),
+     main=paste0("Sum of the random draws (n=",sample.size,")"))
+par(new=T)
+this.norm <- function(x) dnorm(x,
+                               mean=pop.mean*sample.size,
+                               sd=sqrt(sample.size*pop.var))
+curve(this.norm,add=T,col="blue",lty=2)
+mean(all.sample.sum)
+var(all.sample.sum)
+```
+
+
+Above, with increasing number of observations, the distribution of the sample sum becomes closer to a normal distribution. If we draw an infinitely large number of samples with a certain size, the distribution converges to a normal distribution whose mean is identical with the population mean times sample size and variance  with the population variance times the sample size.    
+
+
+If you divide the sample sum by the sample size, you will obtain the sample mean. In the above figure, we always had the same sample size (n=100), therefore the sample mean also has the same form of the distribution, which also converges to a normal distribution.
+
+
+```{r}
+all.sample.mean <- all.sample.sum/sample.size
+plot(density(all.sample.mean),
+     main=paste0("Mean of the random draws (n=",sample.size,")"))
+par(new=T)
+this.norm <- function(x) dnorm(x,
+                               mean=pop.mean,
+                               sd=sqrt(pop.var/sample.size))
+curve(this.norm,add=T,col="blue",lty=2)
+```
+
+
+
+
