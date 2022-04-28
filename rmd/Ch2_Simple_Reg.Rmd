@@ -211,7 +211,6 @@ The problem of this approach is that we do not know the true value of error vari
 
 ```{r}
 
-
 all.error.estimate <- rep(NA,num.datasets)
 
 for (i in 1:num.datasets){
@@ -227,6 +226,7 @@ hist(all.error.estimate,main="",xlab="Estimated variance")
 
 
 ```
+
 The above distribution's expected value is `r round(mean(all.error.estimate),4)`. This is similar to the true error variance `r true.err.var`, but it will not converge to the true value even though we increase the number of simulated datasets.
 
 Fortunately, we have the unbiased estimator for the error variance: $$\hat{\sigma}^2 = \frac{1}{n-2} \sum_i \hat{u}_i^2$$ We divide by n-2 instead of n since the residuals have only n-2 degrees of freedom. In other words, if n-2 residuals are determined, the last 2 have to be automatically determined due to the restrictions in OLS: $$\sum_i \hat{u}_i = 0$$ and $$\sum_i x_i \hat{u}_i = 0$$
