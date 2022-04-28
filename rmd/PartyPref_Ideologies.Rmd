@@ -7,6 +7,10 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/naive_var.R")
+
+
 ```
 
 ## Substantive motivation
@@ -16,7 +20,7 @@ You are interested in what factor determines citizens' evaluation of political p
 To test your idea, you conducted online surveys with students visiting a lecture. To obtain the most important variables, that is, respondents' like/dislike and proximity to different parties, you asked the following questions:
 
 
-```{r , include=FALSE}
+```{r , echo=FALSE}
 knitr::include_graphics("image/Question_Skalo.png")
 
 knitr::include_graphics("image/Question_LR.png")
@@ -275,7 +279,10 @@ cor(long.data$skalo, long.data$lr.dist.sqr)
 
 ## Central limit theorem
 
-We can check the population distribution: 
+In this section, we learn the central limit theorem by using the generated true response to party evaluation. We treat this variable as population, from which we draw multiple samples. Our goal here is to estimate the population mean.
+
+
+First, we can check the population distribution: 
 
 ```{r, echo = TRUE}
 
@@ -286,17 +293,17 @@ pop.var <- mean((pop-pop.mean)^2)
 hist(pop,freq=F)
 ```
 
-The distribution is bimodal and strongly skewed.
+The distribution is multi-modal and skewed. The population mean is `r round(pop.mean,3)` and the population variance is `r round(pop.var,3)``
 
 
-Now, from this population, we can draw multiple samples with size of 2, calculate the sample sum and observe its distribution.
+From this population, we can draw multiple samples with size of 2, calculate the sample sum and observe its distribution.
 
 ```{r, echo = TRUE}
-n.iter <- 1000
+n.iter <- 5000
 sample.size <- 2
 all.sample.sum <- rep(NA,n.iter)
 for (i in 1:n.iter){
-  this.sample <- sample(pop,size=sample.size)
+  this.sample <- sample(pop,size=sample.size,replace=TRUE)
   this.sample.sum <- sum(this.sample)
   all.sample.sum[i] <- this.sample.sum
 }
@@ -311,11 +318,10 @@ var(all.sample.sum)
 From this population, we can draw multiple samples with size of 10, calculate the sample sum and observe its distribution.
 
 ```{r, echo = TRUE}
-n.iter <- 1000
 sample.size <- 10
 all.sample.sum <- rep(NA,n.iter)
 for (i in 1:n.iter){
-  this.sample <- sample(pop,size=sample.size)
+  this.sample <- sample(pop,size=sample.size,replace=TRUE)
   this.sample.sum <- sum(this.sample)
   all.sample.sum[i] <- this.sample.sum
 }
@@ -330,11 +336,10 @@ var(all.sample.sum)
 From this population, we can draw multiple samples with size of 30, calculate the sample sum and observe its distribution.
 
 ```{r, echo = TRUE}
-n.iter <- 1000
 sample.size <- 30
 all.sample.sum <- rep(NA,n.iter)
 for (i in 1:n.iter){
-  this.sample <- sample(pop,size=sample.size)
+  this.sample <- sample(pop,size=sample.size,replace=TRUE)
   this.sample.sum <- sum(this.sample)
   all.sample.sum[i] <- this.sample.sum
 }
@@ -344,34 +349,32 @@ plot(density(all.sample.sum),
 mean(all.sample.sum)
 var(all.sample.sum)
 ```
-
-From the population, we can draw multiple samples with size of 50, calculate the sample sum and observe its distribution.
-
-```{r, echo = TRUE}
-n.iter <- 1000
-sample.size <- 50
-all.sample.sum <- rep(NA,n.iter)
-for (i in 1:n.iter){
-  this.sample <- sample(pop,size=sample.size)
-  this.sample.sum <- sum(this.sample)
-  all.sample.sum[i] <- this.sample.sum
-}
-
-plot(density(all.sample.sum),
-     main=paste0("Sum of the random draws (n=",sample.size,")"))
-mean(all.sample.sum)
-var(all.sample.sum)
-```
-
 
 From the population, we can draw multiple samples with size of 100, calculate the sample sum and observe its distribution.
 
 ```{r, echo = TRUE}
-n.iter <- 1000
 sample.size <- 100
 all.sample.sum <- rep(NA,n.iter)
 for (i in 1:n.iter){
-  this.sample <- sample(pop,size=sample.size)
+  this.sample <- sample(pop,size=sample.size,replace = TRUE)
+  this.sample.sum <- sum(this.sample)
+  all.sample.sum[i] <- this.sample.sum
+}
+
+plot(density(all.sample.sum),
+     main=paste0("Sum of the random draws (n=",sample.size,")"))
+mean(all.sample.sum)
+var(all.sample.sum)
+```
+
+
+From the population, we can draw multiple samples with size of 500, calculate the sample sum and observe its distribution.
+
+```{r, echo = TRUE}
+sample.size <- 500
+all.sample.sum <- rep(NA,n.iter)
+for (i in 1:n.iter){
+  this.sample <- sample(pop,size=sample.size,replace=TRUE)
   this.sample.sum <- sum(this.sample)
   all.sample.sum[i] <- this.sample.sum
 }
@@ -388,10 +391,10 @@ var(all.sample.sum)
 ```
 
 
-Above, with increasing number of observations, the distribution of the sample sum becomes closer to a normal distribution. If we draw an infinitely large number of samples with a certain size, the distribution converges to a normal distribution whose mean is identical with the population mean times sample size and variance  with the population variance times the sample size.    
+Above, with increasing number of observations, the distribution of the sample sum becomes closer to a normal distribution. If we draw an infinitely large number of samples with a certain size, the distribution converges to a normal distribution whose mean is identical with the population mean times sample size and variance  with the population variance times the sample size: $$\sum x \sim N(n\mu , n\sigma^2)$$. If we divide the mean and variance of the above distribution (`r round(mean(all.sample.sum),3)` and `r round(naive.var(all.sample.sum),3)`) by n (`r sample.size`), we obtain `r round(mean(all.sample.sum)/sample.size,3)` and `r round(naive.var(all.sample.sum)/sample.size,3)`. These are very close to the population mean and variance (`r round(pop.mean,3)` and `r round(pop.var,3)`)
 
 
-If you divide the sample sum by the sample size, you will obtain the sample mean. In the above figure, we always had the same sample size (n=100), therefore the sample mean also has the same form of the distribution, which also converges to a normal distribution.
+If you divide the sample sum by the sample size, you will obtain the sample mean. In the above figure, we always had the same sample size (n=500), therefore the sample mean also has the same form of the distribution, which also converges to a normal distribution.
 
 
 ```{r}
@@ -406,5 +409,5 @@ curve(this.norm,add=T,col="blue",lty=2)
 ```
 
 
-
+The mean and variance of this distribution are `r round(mean(all.sample.mean),3)` and `r round(naive.var(all.sample.mean),3)`. This should follow the following: $$\bar{x} \sim N(\mu , \sigma^2 / n)$$.
 
