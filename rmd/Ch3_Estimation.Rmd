@@ -1,0 +1,469 @@
+---
+title: "Chapter 3: Multiple Regression Analysis: Estimation"
+author: "Susumu Shikano"
+date: "Last compiled at `r format(Sys.Date(), '%d. %B %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# loading some functions
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/data_generation.R")
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/ci_sample_mean.R")
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/naive_var.R")
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/naive_cov.R")
+
+# setting some parameters
+
+num.datasets <- 5000 # number of datasets
+sample.size <- 500
+
+n.iv <- 2
+true.slope <- c(5,-2.5)
+true.intercept <- 1
+
+x.mu <- c(2,-1)
+x.Sigma <- cbind(c(3,-1),
+                 c(-1,5))
+
+true.err.var <- 100
+```
+
+
+## Simple Regression under the GM-assumptions
+
+We generate `r num.datasets` datasets with n=`r sample.size` under the GM-assumptions. The number of independent variables is `r n.iv`. The true regression line has the intercept of `r true.intercept` and the slope of `r true.slope`. The variance of the error is `r true.err.var`. The independent variables are generated with the mean `r x.mu`, variances  `r diag(x.Sigma)` and covariance `r x.Sigma[1,2]`.
+
+```{r}
+
+GM.samples <- data.generation(sample.size=sample.size,
+                             n.sim=num.datasets,
+                             n.iv=n.iv,
+                             x.mu=x.mu,
+                             x.Sigma=x.Sigma,
+                             para=c(true.intercept,true.slope),
+                             err.dist = "normal",
+                             err.disp = true.err.var)
+```
+
+## Describing a generated dataset 
+
+The first generated dataset looks as follows:
+
+```{r}
+data.1 <- GM.samples$generated.data[[1]]
+
+head(data.1)
+
+apply(data.1,2,mean)
+
+cov(data.1)
+
+```
+
+Using this dataset, we can estimate the multiple regression model which corresponding to the true model:
+
+```{r}
+
+lm.out <- lm(y ~ X1 + X2  , data=data.1)
+summary(lm.out)
+
+```
+
+
+## Distribution of the estimates of regression coefficients
+
+
+We repeate the multiple regression analysis by using each of `r num.datasets` datasets:
+
+```{r}
+
+all.coef <- matrix(NA,nrow=num.datasets,ncol=4)
+
+for (i in 1:num.datasets){
+    this.data <- GM.samples$generated.data[[i]]
+
+    lm.out <- lm(y ~ X1 + X2 ,data=  this.data)
+
+    all.coef[i,1:3] <- coef(lm.out)
+    all.coef[i,4] <- summary(lm.out)$sigma
+}
+colnames(all.coef) <- c("b0","b1","b2","sigma")
+
+
+
+```
+
+
+Below you will find the distribution of both estimated regression coefficients:
+
+
+```{r}
+par(mfrow=c(1,2))
+hist(all.coef[,"b1"],main="",xlab="Regression coefficients for X1")
+hist(all.coef[,"b2"],main="",xlab="Regression coefficients for X2")
+
+```
+
+
+The mean values of these distributions are `r round(mean(all.coef[,"b1"]),3)` and `r round(mean(all.coef[,"b2"]),3)`. They are almost identical with the true parameter value (`r true.slope`). And if we increase the number of generated datasets, we will obtain the identical value with the truth, which means unbiasedness.
+
+
+## Variance of the OLS estimators
+
+
+According to the textbook, the variance of the OLS slope estimators in a multipre regression model is: $$Var(\hat{\beta}_j) = \frac{\sigma^2}{SST_j(1-R^2_j)}$$. We can check this by using the first generated data.
+
+
+```{r}
+lm.out <- lm(y ~ X1 + X2  , data=data.1)
+summary(lm.out)
+
+```
+
+For this regression result, we try to reconstruct the standard errors of the slope estimates:
+
+```{r}
+SST.1 <- sum((data.1$X1 - mean(data.1$X1))^2)
+rsq.1 <- summary(lm(X1 ~ X2 , data=data.1))$r.squared
+
+var.1 <- true.err.var/(SST.1 * (1-rsq.1))
+
+sqrt(var.1)
+
+SST.2 <- sum((data.1$X2 - mean(data.1$X2))^2)
+rsq.2 <- summary(lm(X2 ~ X1 , data=data.1))$r.squared
+
+var.2 <- true.err.var/(SST.2 * (1-rsq.2))
+
+sqrt(var.2)
+
+```
+
+The  standard errors calculated based on the above formula is similar, but slightly different from the above result. This is because we used the true error variance for calculation while the above regression result is based on the estimated error variance. We can correspondingly replace the true error variance with the estimated variance (squared residual standard error in the above output).
+
+
+```{r}
+
+SST.1 <- sum((data.1$X1 - mean(data.1$X1))^2)
+rsq.1 <- summary(lm(X1 ~ X2 , data=data.1))$r.squared
+
+var.1 <- (summary(lm.out)$sigma)^2/(SST.1 * (1-rsq.1))
+
+sqrt(var.1)
+
+SST.2 <- sum((data.1$X2 - mean(data.1$X2))^2)
+rsq.2 <- summary(lm(X2 ~ X1 , data=data.1))$r.squared
+
+var.2 <- (summary(lm.out)$sigma)^2/(SST.2 * (1-rsq.2))
+
+sqrt(var.2)
+
+```
+
+Here, we have the identical values for the standard errors.
+
+To estimate the error variance, we have to take care about the degrees of freedom. In the simple regression analysis, we divided the sum of square residuals by n-2. The residuals of the above multiple regression model have in contrast n-3 degrees of freedom. Correspondingly, we have to divide the sum of squared residuals by n-3.
+
+
+```{r}
+
+all.ssr <- rep(NA,num.datasets)
+
+for (i in 1:num.datasets){
+    this.data <- GM.samples$generated.data[[i]]
+
+    lm.out <- lm(y ~ X1 + X2,data=  this.data)
+
+    all.ssr[i] <- sum(lm.out$residuals^2)
+}
+
+error.estimates <- NULL
+for (i in 0:5){
+  error.estimates <- c(error.estimates,
+                       mean(all.ssr/(sample.size- i)))
+}
+
+
+plot(error.estimates ~ c(0:5),axes=F,
+     xlab="denominator",ylab="Estimated error",pch=19)
+axis(1,at=c(0:5),paste("n-",c(0:5)))
+axis(2)
+abline(h=true.err.var)
+text(4,true.err.var,"True value",pos=1)
+```
+
+
+## Multicollinearity
+
+The third of the GM-assumptions is slightly different between the simple and multiple regression model. The former assumes only that X has a positive variance. The latter assumes additionally that there is no exact linear relationship among independent variables.
+
+We can see now what will happen if two independent variables of the above multiple regression has an almost linear relationship between both independent variables. This can be generated by setting the correlation of both X with almost one:
+
+```{r}
+
+x.Sigma.mc <- cbind(c(3,-4.55),
+                 c(-4.55,7))
+cov2cor(x.Sigma.mc)
+
+MC.samples <- data.generation(sample.size=sample.size,
+                             n.sim=num.datasets,
+                             n.iv=n.iv,
+                             x.mu=x.mu,
+                             x.Sigma=x.Sigma.mc,
+                             para=c(true.intercept,true.slope),
+                             err.dist = "normal",
+                             err.disp = true.err.var)
+```
+
+Now, we can estimate the multiple regression models for all generated data:
+
+
+```{r}
+
+all.coef.mc <- matrix(NA,nrow=num.datasets,ncol=4)
+
+for (i in 1:num.datasets){
+    this.data <- MC.samples$generated.data[[i]]
+
+    lm.out <- lm(y ~ X1 + X2 ,data=  this.data)
+
+    all.coef.mc[i,1:3] <- coef(lm.out)
+    all.coef.mc[i,4] <- summary(lm.out)$sigma
+}
+colnames(all.coef.mc) <- c("b0","b1","b2","sigma")
+
+
+
+```
+
+
+Below you will find the distribution of both estimated regression coefficients based on the previous data (with low correlation between X) and those based on the current data with a very high correlation between X:
+
+
+```{r}
+par(mfrow=c(2,2))
+hist(all.coef[,"b1"],main="Lower cor(X1,X2)",xlab="Regression coefficients for X1")
+hist(all.coef[,"b2"],main="Lower cor(X1,X2)",xlab="Regression coefficients for X2")
+
+hist(all.coef.mc[,"b1"],main="Very high cor(X1,X2)",xlab="Regression coefficients for X1")
+hist(all.coef.mc[,"b2"],main="Very high cor(X1,X2)",xlab="Regression coefficients for X2")
+
+```
+
+While there is no bias, the variance for the estimates based on the current data is much higher. If there is the perfect correlation between both independent variables, the variance becomes infinitely large.
+
+
+## Omitted variable bias: Simple case
+
+
+Above analysis was based on the the regression model which corresponds to the true model with two independent variables. What will happen if we do not consider the second independent variable and estimate the simple regression model: 
+
+
+```{r}
+
+lm.out <- lm(y ~ X1 + X2  , data=data.1)
+summary(lm.out)
+
+lm.out.om <- lm(y ~ X1   , data=data.1)
+summary(lm.out.om)
+
+
+```
+
+The slope of X1 is estimated to be `r round(coef(lm.out)[2],3)` in the multiple regression model, while the simple regression model estimates the same slope to be `r round(coef(lm.out.om)[2],3)`. 
+
+
+From the textbook, we know the following relationship:$$\tilde{\beta}_1 = \hat{\beta}_1 + \hat{\beta}_2 \tilde{\delta}_1 $$, where the last delta term is the slope when we regress X2 on X1:
+
+
+```{r}
+lm.out.delta <- lm(X2 ~ X1   , data=data.1)
+summary(lm.out.delta)
+
+```
+
+
+
+You can check whether the above equation is true by using the numerical examples above.
+
+
+
+We can repeat this analysis for all generated data and compare the results:
+
+
+```{r}
+
+all.coef.om <- matrix(NA,nrow=num.datasets,ncol=3)
+
+for (i in 1:num.datasets){
+    this.data <- GM.samples$generated.data[[i]]
+
+    lm.out <- lm(y ~ X1  ,data=  this.data)
+
+    all.coef.om[i,1:2] <- coef(lm.out)
+    all.coef.om[i,3] <- summary(lm.out)$sigma
+}
+colnames(all.coef.om) <- c("b0","b1","sigma")
+
+par(mfrow=c(1,2))
+plot(all.coef[,"b1"],all.coef.om[,"b1"],col="grey",pch=19,
+     xlab="Multiple Regression",ylab="Simple Regression")
+abline(coef=c(0,1),col="red")
+abline(v=mean(all.coef[,"b1"]),col="red",lty=2)
+abline(h=mean(all.coef.om[,"b1"]),col="red",lty=2)
+
+
+whole.data <- c(all.coef[,"b1"],all.coef.om[,"b1"])
+plot(density(all.coef[,"b1"],from=min(whole.data),to=max(whole.data)),
+     main="",xlab="",ylab="Density",
+     ylim=c(0,1.5))
+par(new=T)
+plot(density(all.coef.om[,"b1"],from=min(whole.data),to=max(whole.data)),
+     ann=F,axes=F,
+     ylim=c(0,1.5),lty=2)
+legend("topright",lty=c(1,2),c("Multiple reg","Simple reg"),bty="n")
+
+```
+
+The solid red line corresponds to the 45-degree line. Both dotted red lines corresponds to the mean of each estimates. Accordingly, the simple regression over-estimates the slope of X1. The mean difference of both estimates constitutes the bias caused by the omitted variable (here X2): the omitted variable bias.
+
+
+
+
+
+The direction of the omitted variable bias is determined by the covariance of both independent variables (`r x.Sigma[1,2]`) and the slope of the omitted variable (`r true.slope[2]`). Check the direction with Table 3.2 of the textbook.
+
+
+The omitted variable bias is a consequence of violation of the zero conditional mean. To see this, we observe again the first generated dataset:
+
+```{r}
+par(mfrow=c(1,2))
+
+plot(data.1$y ~ data.1$X1,ylab="y",xlab="x")
+abline(coef=GM.samples$para[1:2])
+
+error.om <- data.1$error + data.1$X2*true.slope[2]
+plot(error.om ~ data.1$X1,ylab="Errors",xlab="x")
+abline(h=0)
+
+
+```
+
+By using the right-hand side panel, we can see whether the zero conditional mean is violated:
+
+
+```{r}
+error.om <- data.1$error + data.1$X2*true.slope[2]
+#y.range <- range(data.1$error)
+y.range <- range(error.om)
+x.range <- range(data.1$X1)
+
+plot(error.om ~ data.1$X1,ylab="Errors",xlab="x",
+     xlim=x.range,ylim=y.range)
+
+x.values <- seq(min(data.1$X1),max(data.1$X1),length=25)
+x.interval <- x.values[2] -x.values[1]
+
+conditional.mean <- lower.b <- upper.b <- rep(NA,length(x.values))
+for (i in 1:length(conditional.mean)){
+  
+  selected.error <- error.om[(data.1$X1>(x.values[i]-x.interval)) & 
+                                             (data.1$X1<(x.values[i]+x.interval)) ]
+  conditional.mean[i] <- mean(selected.error)
+  this.ci <- ci.sample.mean(selected.error)
+  lower.b[i] <- this.ci$lower.b
+  upper.b[i] <- this.ci$upper.b
+  
+}
+
+par(new=T)
+plot(conditional.mean ~ x.values,ann=F,axes=F,
+     xlim=x.range,ylim=y.range,
+     col="red",pch=19,type="b")
+abline(h=0,lty=2,lwd=3)
+for (i in 1:length(conditional.mean)){
+  lines(rep(x.values[i],2),c(upper.b[i],lower.b[i]),col="red",lwd=2)
+}
+
+```
+
+In the figure, it is clearly to see the violation of the zero conditional mean. 
+
+## When do we have no omitted variable bias
+
+There are two possibilities where we have no omitted variable bias. First, the omitted variable has no impact on y. Second, the omitted variable has zero correlation with the other independent variable. The latter case can be now simulated by setting the corresponding covariance with 0:
+
+
+```{r}
+
+x.Sigma.2 <- cbind(c(3,0),
+                 c(0,5))
+
+GM.samples.2 <- data.generation(sample.size=sample.size,
+                             n.sim=num.datasets,
+                             n.iv=n.iv,
+                             x.mu=x.mu,
+                             x.Sigma=x.Sigma.2,
+                             para=c(true.intercept,true.slope),
+                             err.dist = "normal",
+                             err.disp = true.err.var)
+```
+
+
+We can now repeat the regresson analysis with and without the second independent variable as before:
+
+
+```{r}
+
+
+all.coef <- matrix(NA,nrow=num.datasets,ncol=4)
+
+for (i in 1:num.datasets){
+    this.data <- GM.samples.2$generated.data[[i]]
+
+    lm.out <- lm(y ~ X1 + X2 ,data=  this.data)
+
+    all.coef[i,1:3] <- coef(lm.out)
+    all.coef[i,4] <- summary(lm.out)$sigma
+}
+colnames(all.coef) <- c("b0","b1","b2","sigma")
+
+
+all.coef.om <- matrix(NA,nrow=num.datasets,ncol=3)
+
+for (i in 1:num.datasets){
+    this.data <- GM.samples.2$generated.data[[i]]
+
+    lm.out <- lm(y ~ X1  ,data=  this.data)
+
+    all.coef.om[i,1:2] <- coef(lm.out)
+    all.coef.om[i,3] <- summary(lm.out)$sigma
+}
+colnames(all.coef.om) <- c("b0","b1","sigma")
+
+par(mfrow=c(1,2))
+
+plot(all.coef[,"b1"],all.coef.om[,"b1"],col="grey",pch=19,
+     xlab="Multiple Regression",ylab="Simple Regression")
+abline(coef=c(0,1),col="red")
+abline(v=mean(all.coef[,"b1"]),col="red",lty=2)
+abline(h=mean(all.coef.om[,"b1"]),col="red",lty=2)
+
+whole.data <- c(all.coef[,"b1"],all.coef.om[,"b1"])
+plot(density(all.coef[,"b1"],from=min(whole.data),to=max(whole.data)),
+     main="",xlab="",ylab="Density",
+     ylim=c(0,1.5))
+par(new=T)
+plot(density(all.coef.om[,"b1"],from=min(whole.data),to=max(whole.data)),
+     ann=F,axes=F,
+     ylim=c(0,1.5),lty=2)
+legend("topright",lty=c(1,2),c("Multiple reg","Simple reg"),bty="n")
+
+
+```
+
+It is clearly to see both estimates are unbiased. 
+
+
