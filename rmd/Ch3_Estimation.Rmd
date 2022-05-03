@@ -75,11 +75,12 @@ summary(lm.out)
 ## Distribution of the estimates of regression coefficients
 
 
-We repeate the multiple regression analysis by using each of `r num.datasets` datasets:
+We repeat the multiple regression analysis by using each of `r num.datasets` datasets:
 
 ```{r}
 
 all.coef <- matrix(NA,nrow=num.datasets,ncol=4)
+all.coef.sd <- matrix(NA,nrow=num.datasets,ncol=3)
 
 for (i in 1:num.datasets){
     this.data <- GM.samples$generated.data[[i]]
@@ -88,9 +89,10 @@ for (i in 1:num.datasets){
 
     all.coef[i,1:3] <- coef(lm.out)
     all.coef[i,4] <- summary(lm.out)$sigma
+    all.coef.sd[i,] <- coef(summary(lm.out))[,2]
 }
 colnames(all.coef) <- c("b0","b1","b2","sigma")
-
+colnames(all.coef.sd) <- c("b0","b1","b2")
 
 
 ```
@@ -296,6 +298,7 @@ We can repeat this analysis for all generated data and compare the results:
 ```{r}
 
 all.coef.om <- matrix(NA,nrow=num.datasets,ncol=3)
+all.coef.om.sd <- matrix(NA,nrow=num.datasets,ncol=2)
 
 for (i in 1:num.datasets){
     this.data <- GM.samples$generated.data[[i]]
@@ -304,8 +307,10 @@ for (i in 1:num.datasets){
 
     all.coef.om[i,1:2] <- coef(lm.out)
     all.coef.om[i,3] <- summary(lm.out)$sigma
+    all.coef.om.sd[i,] <- coef(summary(lm.out))[,2]
 }
 colnames(all.coef.om) <- c("b0","b1","sigma")
+colnames(all.coef.om.sd) <- c("b0","b1")
 
 par(mfrow=c(1,2))
 plot(all.coef[,"b1"],all.coef.om[,"b1"],col="grey",pch=19,
@@ -328,6 +333,7 @@ legend("topright",lty=c(1,2),c("Multiple reg","Simple reg"),bty="n")
 ```
 
 The solid red line corresponds to the 45-degree line. Both dotted red lines corresponds to the mean of each estimates. Accordingly, the simple regression over-estimates the slope of X1. The mean difference of both estimates constitutes the bias caused by the omitted variable (here X2): the omitted variable bias.
+
 
 
 
@@ -390,6 +396,22 @@ for (i in 1:length(conditional.mean)){
 ```
 
 In the figure, it is clearly to see the violation of the zero conditional mean. 
+
+
+
+Related to the omitted variable bias, there is a statement in the textbook, which may be misleading. According to the statement, the following has to be the case:$$Var(\tilde{\beta}_1) < Var(\hat{\beta}_1)$$ If we compare the estimated standard errors based on the simulated data, we find the opposite (see Figure below): 
+
+
+```{r}
+plot(all.coef.sd[,"b1"],all.coef.om.sd[,"b1"],col="grey",pch=19,
+     xlab="Multiple Regression",ylab="Simple Regression",
+     main="Estimated standard errors of b1")
+abline(coef=c(0,1),col="red")
+
+```
+
+Here, the above inequality is reversed. That is, the biased coefficient has a larger variance than the unbiased coefficient. This difference is because the above textbook's statement is based on the true error variance, while the comparison here is based on the estimated error variance. The estimated error variance is based on that of residuals, which is larger due to the omitted variable (here X2). Actually, Wooldridge does know this fact and states it after the above statement.
+
 
 ## When do we have no omitted variable bias
 
