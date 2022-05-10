@@ -411,3 +411,266 @@ curve(this.norm,add=T,col="blue",lty=2)
 
 The mean and variance of this distribution are `r round(mean(all.sample.mean),3)` and `r round(naive.var(all.sample.mean),3)`. This should follow the following: $$\bar{x} \sim N(\mu , \sigma^2 / n)$$.
 
+
+
+
+
+## Regressing like/dislike of parties on left-right ideological distance and log response time.
+
+
+We first recap the simple regression model, which we estimated above:
+
+
+```{r}
+summary(lm.out.abs <- lm((long.data$skalo.true ~ long.data$lr.dist.abs)))
+
+```
+
+You think that the time to respond to the questions can affect party evaluation, as well. That is, those who quickly answer may differ from those who deliberate in answering.
+
+First, you can check the distribution of the time:
+
+```{r}
+hist(long.data$time, 
+     main="",xlab="Response time (in sec)",
+     freq=FALSE)
+```
+
+You see some outliers who needed much longer time to respond the questions than the others. To reduce the impact of such outliers, you create a new variably by  logarithmizing the original variable:
+
+```{r}
+
+long.data$log.time <- log(long.data$time) 
+
+hist(long.data$log.time, 
+     main="",xlab="Response time (in log(sec))",
+     freq=FALSE)
+```
+
+Now you include the log response time into the regression analysis:
+
+
+```{r}
+
+
+summary(lm.out.abs.time <- 
+          lm(skalo.true ~ lr.dist.abs + log.time,
+             data=long.data))
+
+
+```
+
+The new variable, log response time, has a positive effect. However, the effect is not significant at 5% level.  
+
+To interpret the slope coefficient of a logarithmized variable is tricky.According to the regression result above, unit increase of log response time is associated with increase of `r coef(lm.out.abs.time)[3]`. However, a unit increase of the log response time is not constant on the scale of the raw response time.
+
+To see what a unit increase of the log response time means, we can first check the logarithm function.
+
+```{r}
+curve(log,0,70,axes=F)
+axis(1,at=exp(seq(0,5)),
+     c("",round(exp(seq(1,5)),2))
+     )
+axis(2,at=seq(0,5))
+
+for (i in 1:4){
+  lines(c(0,exp(i)),rep(i,2),lty=2)
+  lines(rep(exp(i),2),c(0,i),lty=2)
+}
+
+```
+
+Note that the opposite function of log() is the exponential function (exp()). To solve e.g. log(x)=2 for x, we can calculate just exp(2)=`r exp(2)`.
+
+The above figure clearly demonstrates that increase from log(2) to log(3) and that from log(3) to log(4) correspond different increase in the raw response time. If you however take the growth, it is constant. That is:
+
+- exp(3)/exp(2) = `r round(exp(3),2)`/`r round(exp(2),2)` = `r exp(3)/exp(2)`
+- exp(4)/exp(3) = `r round(exp(4),2)`/`r round(exp(3),2)` = `r exp(4)/exp(3)`
+
+That is, we can interpret the coefficient of the log response time (`r coef(lm.out.abs.time)[3]`) as change in Y given X grows constantly. More specifically, given a response time is 1% longer, the evaluation will change with `r coef(lm.out.abs.time)[3]`/100.
+
+
+Consequently, the result will not change if we take the log of response time in minutes instead of in seconds:
+
+```{r}
+long.data$time.min <- long.data$time/60
+
+long.data$log.time.min <- log(long.data$time.min)
+
+head(long.data[,c("time","log.time","time.min","log.time.min")],n=10)
+
+
+summary(lm.out.abs.time.min <- 
+          lm(skalo.true ~ lr.dist.abs + log.time.min,
+             data=long.data))
+
+```
+
+
+Concerning the estimated effect of the left-right distance, it is almost identical with that in the previous model with only one independent variable: `r coef(lm.out.abs)[2]`. This is because there is alsmot zero covariance between both independent variables. Corresnpondingly, the estimated effect is almost zero if you regress the log response time on the left-right distance:
+
+
+```{r}
+
+naive.cov(long.data$log.time , long.data$lr.dist.abs)
+
+summary(lm(log.time ~ lr.dist.abs,data=long.data))
+```
+
+That is, there is no omitted variable bias due to the response time variable. Note that this does not necessarily mean that there does not exist any omitted variable bias, at all. Potentially there can be further important variable. 
+
+
+## Regressing like/dislike of parties on left-right ideological distance, the squared distance and log response time.
+
+We now extend the above multiple regression models with the squared distance (lr.dist.sqr). 
+
+
+```{r}
+
+summary(lm.out.abs.sqr.time <- 
+          lm(skalo.true ~ lr.dist.abs +  lr.dist.sqr + log.time ,
+             data=long.data))
+
+```
+
+You have to be able to test the corresponding hypotheses in one-sided and two-sided manners.
+
+
+## t distribution for one-sided and two-sided alternatives
+
+```{r}
+
+x.scale <- seq(-3,3,by=0.01)
+this.df <- lm.out.abs.sqr.time$df.residual
+this.y <- dt(x.scale,df=this.df)
+
+par(mfrow=c(1,2))
+
+for (zweiseitig in c(FALSE,TRUE)){
+  plot(x.scale,this.y,type="l",xlab="t",ylab="Density",
+       main=paste("t-distribution with df=",this.df))
+
+  if (zweiseitig) {this.95 <- qt(c(.025,.975),df=this.df)
+       } else {
+       this.95 <- qt(c(.95),df=this.df)
+     }
+  for (i in 1:length(this.95)){
+    lines(rep(this.95[i],2),c(0,dt(this.95[i],df=this.df)),lty=2)
+    text(this.95[i],0,pos=2,round(this.95[i],3))
+  }
+  text(0,0.2,"95%")
+}
+
+
+```
+
+
+
+
+## Constructing the 95% confidence interval
+
+Obtain the point estimates and standard errors.
+
+```{r}
+
+point.estimates <- coefficients(summary(lm.out.abs.sqr.time))[,1]
+standard.errors <- coefficients(summary(lm.out.abs.sqr.time))[,2]
+```
+
+Compute the critical value.
+
+```{r}
+c.95 <- qt(0.975,df= lm.out.abs.sqr.time$df.residual)
+c.95
+```
+
+Calculate the upper and lower bounds of confidence intervals.
+
+```{r}
+upperb <- point.estimates + standard.errors * c.95 
+lowerb <- point.estimates + standard.errors * c.95 *-1
+
+cbind(point.estimates,standard.errors,
+      lowerb,upperb)
+```
+
+
+## Is the effect of log reponse time larger than that of the squared distance?
+
+To do this, you have to set up another variable by summing both independent variables.  
+
+```{r}
+long.data$time.sqr <- long.data$log.time + long.data$lr.dist.sqr
+```
+
+Replace the squared distance  variable with the new variable.
+
+```{r}
+summary(lm.out.abs.sqr.time.2 <- 
+          lm(skalo.true ~ lr.dist.abs + log.time + time.sqr ,
+             data=long.data))
+```
+
+The effect of "log.time" is the difference of the effect of "log.time" and "squared distance" in the original regression. The output tells that the difference is not significant at 5% level.
+
+
+
+## Testing against the null hypothesis that "log.time" AND "lr.dist.sqr" have no effect on Y.
+
+To test whether "log.time" AND "lr.dist.sqr" variables have no effect on the dependent variable, We first estimate the restricted model without the above variables.
+
+```{r}
+summary(lm.out.res <- 
+          lm(skalo.true ~ lr.dist.abs ,
+             data=long.data))
+```
+ 
+Subsequently, we calculate F value by using SSR.
+ 
+```{r}
+ 
+SSR.ur <- sum(lm.out.abs.sqr.time$residuals^2)
+SSR.r <-  sum(lm.out.res$residuals^2)
+q <- lm.out.res$df.residual - lm.out.abs.sqr.time$df.residual
+
+F <- ((SSR.r - SSR.ur)/q)/(SSR.ur/lm.out.abs.sqr.time$df.residual)
+F
+```
+
+ The same value can be also obtained  by using $R^2$.
+ 
+```{r}
+
+R2.ur <- summary(lm.out.abs.sqr.time)$r.squared
+R2.r <- summary(lm.out.res)$r.squared
+
+
+F <- ((R2.ur - R2.r)/q)/((1-R2.ur)/lm.out.abs.sqr.time$df.residual)
+F 
+
+```
+
+We now compare the F value with the F distribution. 
+ 
+
+```{r}
+
+x.scale <- seq(0,10,by=0.01)
+this.y <- df(x.scale,df1=q,df2=lm.out.abs.sqr.time$df.residual)
+
+plot(x.scale,this.y,type="l",xlab="t",ylab="Density",
+       main=paste("F-distribution with df=",q,"and",lm.out.abs.sqr.time$df.residual))
+
+this.95 <- qf(c(.95),df1=q,df2=lm.out.abs.sqr.time$df.residual)
+abline(v=this.95,lty=2)
+text(1,0.2,"95%")
+text(this.95,0,pos=2,round(this.95,3))
+text(this.95,0.2,"Rejection region",pos=4)
+
+
+``` 
+ 
+Since the above calculated F is in the rejection region, we can reject the null hypothesis. 
+
+
+
