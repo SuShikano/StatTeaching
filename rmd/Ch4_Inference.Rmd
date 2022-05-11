@@ -1,0 +1,375 @@
+---
+title: 'Chapter 4: Multiple Regression Analysis: Inference'
+author: "Susumu Shikano"
+date: "Last compiled at `r format(Sys.Date(), '%d. %B %Y')`"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# loading some functions
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/data_generation.R")
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/ci_sample_mean.R")
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/naive_var.R")
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/naive_cov.R")
+
+# setting some parameters
+
+num.datasets <- 5000 # number of datasets
+sample.size <- 25
+
+n.iv <- 2
+true.slope <- c(5,-2.5)
+true.intercept <- 1
+
+x.mu <- c(2,-1)
+x.Sigma <- cbind(c(3,-1),
+                 c(-1,5))
+
+true.err.var <- 100
+```
+
+
+## Classic Linear Model (CLM) assumptions
+
+
+We generate `r num.datasets` datasets with n=`r sample.size` under the GM-assumptions. The number of independent variables is `r n.iv`. The true regression line has the intercept of `r true.intercept` and the slope of `r true.slope`. The independent variables are generated with the mean `r x.mu`, variances  `r diag(x.Sigma)` and covariance `r x.Sigma[1,2]`.
+
+We repeat this data generation twice. The first one assumes the normally distributed errors and the second one assumes uniformly distributed errors. In both cases, The variance of the error is `r true.err.var`. 
+
+
+```{r}
+
+CLM.samples <- data.generation(sample.size=sample.size,
+                             n.sim=num.datasets,
+                             n.iv=n.iv,
+                             x.mu=x.mu,
+                             x.Sigma=x.Sigma,
+                             para=c(true.intercept,true.slope),
+                             err.dist = "normal",
+                             err.disp = true.err.var)
+
+unif.range <- sqrt(true.err.var*12) # transform the variance into the range
+nonCLM.samples <- data.generation(sample.size=sample.size,
+                             n.sim=num.datasets,
+                             n.iv=n.iv,
+                             x.mu=x.mu,
+                             x.Sigma=x.Sigma,
+                             para=c(true.intercept,true.slope),
+                             err.dist = "uniform",
+                             err.disp = unif.range)
+
+```
+
+
+We repeat the multiple regression analysis by using each of `r num.datasets` datasets:
+
+```{r}
+
+all.coef <- array(NA,dim=c(num.datasets,4,2))
+all.coef.se <- array(NA,dim=c(num.datasets,3,2))
+
+for (i in 1:num.datasets){
+    this.data <- CLM.samples$generated.data[[i]]
+
+    lm.out <- lm(y ~ X1 + X2 ,data=  this.data)
+
+    all.coef[i,1:3,1] <- coef(lm.out)
+    all.coef[i,4,1] <- summary(lm.out)$sigma
+    all.coef.se[i,,1] <- coef(summary(lm.out))[,2]
+
+    this.data <- nonCLM.samples$generated.data[[i]]
+
+    lm.out <- lm(y ~ X1 + X2 ,data=  this.data)
+
+    all.coef[i,1:3,2] <- coef(lm.out)
+    all.coef[i,4,2] <- summary(lm.out)$sigma
+    all.coef.se[i,,2] <- coef(summary(lm.out))[,2]
+    
+    
+    }
+dimnames(all.coef)[[2]] <- c("b0","b1","b2","sigma")
+dimnames(all.coef.se)[[2]] <- c("b0","b1","b2")
+
+
+```
+
+
+Below you will find the distribution of both estimated regression coefficients:
+
+
+```{r}
+par(mfrow=c(1,2))
+
+for (i.fig in 1:2){
+    x.range <- range(c(all.coef[,c("b1","b2")[i.fig],]))
+    plot(density.out <- density(all.coef[,c("b1","b2")[i.fig],1]),
+         main="",xlab=paste0("Regression coefficients for X",i.fig),
+         xlim=x.range)
+    abline(v=mean(all.coef[,c("b1","b2")[i.fig],1]))
+    par(new=T)
+    plot(density(all.coef[,c("b1","b2")[i.fig],2]),ann=F,axes=F,
+         xlim=x.range,lty=2,
+         ylim=c(0,max(density.out$y)))
+    abline(v=mean(all.coef[,c("b1","b2")[i.fig],2]),lty=2)
+    legend("topright",lty=c(1,2),c("CLM","Uniform"),bty="n")
+    
+}
+
+```
+
+It is apparent that estimators are unbiased for both sets of datasets. This also corresponds to the Gauss-Markov theorem since both data generating processes fulfill all the GM-assumptions. 
+
+
+In contrast, the distributions of the estimated standard errors look different as the figure below suggests:
+
+```{r}
+par(mfrow=c(1,2))
+
+for (i.fig in 1:2){
+    x.range <- range(c(all.coef.se[,c("b1","b2")[i.fig],]))
+    plot(density.out <- density(all.coef.se[,c("b1","b2")[i.fig],1]),
+         main="",xlab=paste0("Standard error for beta1",i.fig),
+         xlim=x.range)
+    abline(v=mean(all.coef.se[,c("b1","b2")[i.fig],1]))
+    par(new=T)
+    plot(density(all.coef.se[,c("b1","b2")[i.fig],2]),ann=F,axes=F,
+         xlim=x.range,lty=2,
+         ylim=c(0,max(density.out$y)))
+    abline(v=mean(all.coef.se[,c("b1","b2")[i.fig],2]),lty=2)
+    legend("topright",lty=c(1,2),c("CLM","Uniform"),bty="n")
+}
+
+```
+
+The distributions of the estimated standard errors differ in their shapes among both sets of datasets. Those based on the uniform distribution have less dispertion than thosen based on the normal distribution. 
+
+This suggest that the t-values, the point estimates divided by their standard errors, follow different distributions. Since the CLM assumptions guarantees that the above t-values follow a t-distribution, the t-values not based on the CLM assumptions do not follow the t-distribution.  
+
+
+## Confidence intervals
+
+We can now construct confidence intervals for all generated samples.
+
+```{r}
+par(mfrow=c(1,2))
+
+for (i.fig in 1:2){
+    point.e <- all.coef[,"b1",i.fig]
+    se <- all.coef.se[,"b1",i.fig]
+    true.value <- true.slope[1]
+    
+    ci <-  cbind(qt(c(0.025),df=sample.size-3)*se + point.e,
+                 qt(c(0.975),df=sample.size-3)*se + point.e)
+    
+    range.x <- range(ci)
+    include.true <- ifelse(ci[,1]<true.value & ci[,2]>true.value,1,0)
+    
+    plot(point.e,1:length(point.e),pch=19,xlim=range.x,
+         main=c("CLM","non CLM")[i.fig],
+         axes=F,ylab="",xlab="Estimates"
+         )
+    axis(1)
+    for (i in 1:length(point.e)){
+      lines(ci[i,],rep(i,2),col=c("black","red")[2-include.true[i]])
+    }
+    abline(v=true.slope[1],col="white",lwd=2)
+
+    print(mean(include.true))
+}
+
+```
+
+For both sets of datasets, about 95\% of confidence intervals cover the true population value. The confidence intevals based on the data without the CLM-assumptions also perform quite well.  
+
+
+
+## Effect of scales on the regression coefficients (revisited)
+
+Now we can generate datasets with 2 independent variables whose slope are very similar.
+
+```{r}
+
+CLM.samples.2 <- data.generation(sample.size=sample.size,
+                             n.sim=1000,
+                             n.iv=n.iv,
+                             x.mu=x.mu,
+                             x.Sigma=x.Sigma,
+                             para=c(true.intercept,c(5,5.1)),
+                             err.dist = "normal",
+                             err.disp = true.err.var)
+
+```
+
+If we estimate the multiple regression model with the first generated data:
+
+```{r}
+data.1 <- CLM.samples.2$generated.data[[1]]
+
+summary(lm(y ~ X1 + X2 ,data=  data.1))
+```
+The estimated effect size is similar. Now we can test whether their difference is significant. For this purpose, we can construct a new variable by adding both independent variables and replace one of the independent variables with the new variable.
+
+
+```{r}
+X12 <- data.1$X1 +data.1$X2
+
+summary(lm(y ~ X12 + X2 ,data=  data.1))
+
+```
+
+The estimated slope of the new variable (X12) corresponds to the slope of the replaced variable (X1) and the slope of the other independent variable (X2) corresponds to the difference.
+
+We repeat the same analysis for all generated datasets.
+
+
+```{r}
+
+all.coef.2 <- array(NA,dim=c(CLM.samples.2$n.sim,4,2))
+all.coef.p.2 <- array(NA,dim=c(CLM.samples.2$n.sim,3,2))
+ 
+for (i in 1:CLM.samples.2$n.sim){
+    this.data <- CLM.samples.2$generated.data[[i]]
+
+    X12 <- this.data$X1 +this.data$X2
+    lm.out <- lm(y ~ X12 + X2 ,data=  this.data)
+
+    all.coef.2[i,1:3,1] <- coef(lm.out)
+    all.coef.2[i,4,1] <- summary(lm.out)$sigma
+    all.coef.p.2[i,1:3,1] <- coef(summary(lm.out))[,4]
+
+    X12 <- this.data$X1 +this.data$X2/10
+    lm.out <- lm(y ~ X12 + X2 ,data=  this.data)
+    
+    all.coef.2[i,1:3,2] <- coef(lm.out)
+    all.coef.2[i,4,2] <- summary(lm.out)$sigma
+    all.coef.p.2[i,1:3,2] <- coef(summary(lm.out))[,4]
+}
+
+dimnames(all.coef.2)[[2]] <- c("b0","b1","b2","sigma")
+dimnames(all.coef.p.2)[[2]] <- c("b0","b1","b2")
+
+```
+
+
+The distribution of the estimated difference of both slopes appears below.
+
+
+```{r}
+hist(all.coef.2[,"b2",1],
+     main="",xlab="Estimated difference of coefficients")
+
+
+mean(all.coef.p.2[,"b2",1]<0.05)
+```
+
+This distribution's mean is `r round(mean(all.coef.2[,"b2",1]))`, which is almost identical with the difference in the true parameters. The p-value for the correct direction of the difference (i.e. the diference is positive) is under 5\% only in `r round( mean(all.coef.p.2[,"b2",1]<0.1 & all.coef.2[,"b2",1]>0)*100,1)`% of the datasets.
+
+
+We can repeat the same exercise with a rescaled X2. More specifically, we create the new X2 variable by dividing X2 and check the difference of slopes. 
+
+```{r}
+data.1$new.X2 <- data.1$X2/10
+summary(lm(y ~ X1 + new.X2 ,data=  data.1))
+
+data.1$new.X12 <- data.1$X1 +data.1$new.X2
+
+summary(lm(y ~ new.X12 + new.X2 ,data=  data.1))
+
+
+```
+
+Since we have a smaller unit for X2, its slope becomes larger. Consequently, the difference between slopes becomes larger.
+
+We can do the same analysis for all the generated datasets and compare the estimated differences in the slopes and their p-values.
+
+
+```{r}
+
+par(mfrow=c(1,2))
+plot(all.coef.2[,"b2",],
+     xlab="Original scale",ylab="Rescaled (X2/10)",
+     main="Diference in the coefficients"
+     )
+abline(coef=c(0,1))
+
+plot(all.coef.p.2[,"b2",],
+     xlab="Original scale",ylab="Rescaled (X2/10)",
+     main="p-value"
+)
+
+
+```
+
+It is obvious that the estimated difference is larger in all datasets, and p-value is much more often under 5\%. 
+
+From this exercise, we can learn that the sigificance test of differences in slopes strongly depends on the scale of the independent variables at stake. And such comparison is only meaningful if both variables have the same scale. 
+
+
+
+## Testing against the null hypothesis that multiple independent variables have no effect on Y.
+
+We generate another set of datasets under the CLM-assumptions with no effect for the second and third independent variables.
+
+
+```{r}
+
+CLM.samples.3 <- data.generation(sample.size=sample.size,
+                             n.sim=1000,
+                             n.iv=3,
+                             x.mu=c(2,-1,3),
+                             x.Sigma=cbind(c(3,-1,1),
+                                           c(-1,5,2),
+                                           c(1,2,2)),
+                             para=c(true.intercept,c(5,0,0)),
+                             err.dist = "normal",
+                             err.disp = true.err.var)
+
+
+
+```
+ 
+To test against the null hypothesis that the second and third independent variables have no effect on Y, we can rely on the F-test.
+ 
+We can calculate the F-values for all datasets. 
+
+
+```{r}
+
+all.F<- rep(NA,CLM.samples.3$n.sim)
+
+for (i in 1:CLM.samples.3$n.sim){
+    this.data <- CLM.samples.3$generated.data[[i]]
+
+    lm.out <- lm(y ~ X1 + X2 + X3, data=this.data)
+    lm.out.res <- lm(y ~ X1 , data=this.data)
+    
+    SSR.ur <- sum(lm.out$residuals^2)
+    SSR.r <-  sum(lm.out.res$residuals^2)
+    q <- lm.out.res$df.residual - lm.out$df.residual
+
+    all.F[i] <-  ((SSR.r - SSR.ur)/q)/(SSR.ur/lm.out$df.residual)
+
+}
+
+
+```
+ 
+
+We can observe the calculated empirical distribution of the F values, which is based on the population model with no effect of X2 and X3. 
+
+
+```{r}
+
+plot(density(all.F,from=0,to=10),xlim=c(0,10),ylim=c(0,1),
+     main="Empirical and theoretical F distribution",
+     xlab="F") 
+
+this.f.func <- function(x) df(x ,q,lm.out$df.residual)
+curve(this.f.func,0,10,add=TRUE,col="darkgrey")
+
+```
+
+The empirical distribution is well fitted to the theoretical F-distribution with the corresponding degrees of freedom.
