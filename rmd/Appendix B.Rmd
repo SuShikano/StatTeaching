@@ -5,6 +5,8 @@ date: "Last compiled at `r format(Sys.Date(), '%d. %B %Y')`"
 output: html_document
 ---
 
+
+
 ## Generate random numbers by using a normal distribution
 
 We draw 10000 random numbers from a normal distribution whose mean is 20 and standard deviation is 15 (i.e. variance is $15^2 = 225$). The random numbers constitute a random variable which we denote by $X$.
@@ -32,7 +34,7 @@ legend("topright",c(paste("E(Z):",round(mean(Z),2)),
 
 ## Rescaling a normal distribution
 
-We can divide/multiply and/or add/substract an arbitrary constant value. Here, we construct a new random variably by multiplying $X$ by 10 and subsequently add 30.
+We can divide/multiply and/or add/subtract an arbitrary constant value. Here, we construct a new random variably by multiplying $X$ by 10 and subsequently add 30.
 
 
 ```{r, echo = TRUE}
