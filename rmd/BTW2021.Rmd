@@ -92,10 +92,18 @@ gdp <- sociodem[,grep("Bruttoinlandsprodukt",names(sociodem))]
 
 old.gen <- sociodem[,grep("Alter",names(sociodem))]
 old.gen <- old.gen[,5] + old.gen[,6]
+young.gen <- sociodem[,grep("Alter",names(sociodem))]
+young.gen <- young.gen[,2] 
 
 unemployment <- sociodem[,grep("Arbeitslosenquote",names(sociodem))]
 unemp.total <- unemployment[,grep("insgesamt",names(unemployment))]
 unemp.young <- unemployment[,grep("15.bis.24.Jahre",names(unemployment))]
+
+pkw <- sociodem[,grep("PKW",names(sociodem))]
+pkw.e <- pkw[,grep("Elektro",names(pkw))]
+pkw <- pkw[,grep("insgesamt",names(pkw))]
+
+company <- sociodem[,grep("Unternehmen.insgesamt",names(sociodem))]
 
 eligible <- result21[,grep("Wahlberechtigte Zweitstimmen",names(result21))]
 valid <- result21[,grep("Gueltige Stimmen Zweitstimmen",names(result21))]
@@ -111,9 +119,15 @@ union.pr[is.na(union.pr)] <- csu.pr[is.na(union.pr)]
 
 union.pr <- union.pr*100/valid
 
+gru.pr <- result21[,grep("BUeNDNIS 90/DIE GRUeNEN Zweitstimmen",names(result21))]
+gru.pr <- gru.pr *100/valid
+
+fdp.pr <- result21[,grep("Freie Demokratische Partei Zweitstimmen",names(result21))]
+fdp.pr <- fdp.pr *100/valid
 
 afd.pr <- result21[,grep("Alternative fuer Deutschland Zweitstimmen",names(result21))]
 afd.pr <- afd.pr *100/valid
+
 
 
 ```
@@ -476,4 +490,113 @@ abline(h=0,lty=2)
 
 The distributions indicate violence of the homoskedasticity assumption, thus the biased estimates of the regression coefficients' variances.
 
+## Model selection
+
+You regress the vote share of FDP on the following variables:
+
+* Number of companies per 1000 inhabitants
+* Number of registered cars per 1000 inhabitants
+* Number of registered electronic/hybrid cars per 1000 inhabitants
+* Share of the older generation
+* Share of the younger generation
+
+
+```{r}
+summary(lm.out <- lm(fdp.pr ~ company + pkw + pkw.e  + young.gen +  old.gen))
+
+
+```
+
+Since the last two variables concerning the generation are not significant, you estimated another model without these variables:
+
+
+```{r}
+summary(lm.out.res <- lm(fdp.pr ~ company + pkw + pkw.e  ))
+
+
+```
+
+Now you wish to decide for one of the two models. In such a situation, the typical approach is to compute the F-values based on both outcomes:
+
+
+```{r}
+    SSR.ur <- sum(lm.out$residuals^2)
+    SSR.r <-  sum(lm.out.res$residuals^2)
+    q <- lm.out.res$df.residual - lm.out$df.residual
+
+    F <-  ((SSR.r - SSR.ur)/q)/(SSR.ur/lm.out$df.residual)
+
+    F
+```
+
+The computed F-value is then compared with the corresponding F-distribution:
+
+```{r}
+
+x.scale <- seq(0,10,by=0.01)
+this.y <- df(x.scale,df1=q,df2=lm.out$df.residual)
+
+plot(x.scale,this.y,type="l",xlab="t",ylab="Density",
+       main=paste("F-distribution with df=",q,"and",lm.out$df.residual))
+
+this.95 <- qf(c(.95),df1=q,df2=lm.out$df.residual)
+abline(v=this.95,lty=2)
+text(1,0.2,"95%")
+text(this.95,0,pos=2,round(this.95,3))
+text(this.95,0.2,"Rejection region",pos=4)
+
+emp.sig <- 1-pf(F,df1=q,df2=lm.out$df.residual)
+
+abline(v=F,col="red")
+text(F,0.1,
+     paste0("F=",round(F,3),"; p=",round(emp.sig,5)),
+     pos=4)
+```
+
+Accordingly, we can reject the null-hypothesis that both models are equivalent and decide for the first unrestricted model.
+
+
+An alternative approach is based on the Lagrange Multiplier statistic:
+
+
+```{r}
+
+r.tilde <- residuals(lm.out.res)
+
+summary(lm.out.lagr <- lm(r.tilde ~ company + pkw + pkw.e  + young.gen +  old.gen))
+
+r.square.u <- summary(lm.out.lagr)$r.squared
+
+LM <- r.square.u * nrow(lm.out.lagr$model)
+
+LM
+
+```
+
+The calculated LM-value is compared with the corresponding chi-square distribution:
+
+```{r}
+
+x.scale <- seq(0,20,by=0.01)
+this.y <- dchisq(x.scale,df=q)
+
+plot(x.scale,this.y,type="l",xlab="t",ylab="Density",
+       main=paste("Chi^2-distribution with df=",q))
+
+this.95 <- qchisq(c(.95),df=q)
+abline(v=this.95,lty=2)
+text(1,0.2,"95%")
+text(this.95,0,pos=2,round(this.95,3))
+text(this.95,0.2,"Rejection region",pos=4)
+
+emp.sig <- 1-pchisq(LM,df=q)
+
+abline(v=LM,col="red")
+text(LM,0.05,
+     paste0("LM=",round(LM,3),"; p=",round(emp.sig,5)),
+     pos=4)
+
+```
+
+Accordingly, you can obtain the same result of the above F-test.
 
