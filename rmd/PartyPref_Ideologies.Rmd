@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 
 source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/naive_var.R")
-
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/ci_sample_mean.R")
 
 ```
 
@@ -673,4 +673,140 @@ text(this.95,0.2,"Rejection region",pos=4)
 Since the above calculated F is in the rejection region, we can reject the null hypothesis. 
 
 
+
+
+## Confidence intervals for predictions
+
+Let's turn to the original question whether ideological distance affects party evaluation. We have already estimated the simple regression model:
+
+```{r}
+summary(lm.out.abs <- lm((long.data$skalo.true ~ long.data$lr.dist.abs)))
+```
+
+```{r}
+plot(long.data$skalo.true ~ long.data$lr.dist.abs,
+     xlab="Ideological Distance (abs)",
+     ylab="Like/Dislike (true value)")
+abline(lm.out.abs)
+```
+
+The regression line represents the expected value given certain $x$ values. Now, we wish to obtain the standard error of the expected value given $x=c$. For this purpose, we can just regress $y$ on $x-c$.
+
+For example, the expected value for ideological distance with 5 units  has the following standard error:
+
+```{r}
+  new.x <- long.data$lr.dist.abs - 5
+  lm.out <- lm(skalo.true ~ new.x,data=long.data)
+  summary(lm.out)$coefficients
+
+```
+
+The standard error of the intercept `r round(coef(lm.out)[1],3)` is the standard error of the expected value.
+
+We repeat the same exercise for the x values between 0 and 10.
+
+We first calculate the standard errors for all x values:
+
+```{r}
+x.values <- seq(0,10,by=0.1)
+
+all.se <- rep(NA,length(x.values))
+for (i in 1:length(x.values)){
+  new.x <- long.data$lr.dist.abs - x.values[i]
+  lm.out <- lm(skalo.true ~ new.x,data=long.data)
+  all.se[i] <- summary(lm.out)$coefficients[1,2]
+}
+
+plot(x.values,all.se,xlab="Ideological distance",ylab="Standard error")
+
+```
+
+It is obvious that the standard errors of expected values are not constant, but they are larger for extreme values in $x$. In contrast, the smallest standard error is around 3. More precisely, it is at x=`r round(mean(long.data$lr.dist.abs),3)`, which is the mean value of x.
+
+We build the confidence intervals by using the calculated standard errors:
+
+```{r}
+predicted <- coefficients(lm.out.abs)[1] + coefficients(lm.out.abs)[2]*x.values
+
+critical.value <- qt(0.975,df=lm.out.abs$df.residual)
+
+upper.bounds <- predicted + critical.value*all.se
+lower.bounds <- predicted - critical.value*all.se
+
+plot(long.data$skalo.true ~ long.data$lr.dist.abs,ylab="Party evaluation",xlab="Ideological distance",
+            ylim=range(long.data$skalo.true,na.rm=T),
+            xlim=range(long.data$lr.dist.abs,na.rm=T))
+abline(lm.out.abs)
+par(new=T)
+plot(x.values,upper.bounds,ann=F,xlab="",ylab="",axes=F,col="red",type="l",
+            ylim=range(long.data$skalo.true,na.rm=T),
+            xlim=range(long.data$lr.dist.abs,na.rm=T))
+par(new=T)
+plot(x.values,lower.bounds,ann=F,xlab="",ylab="",axes=F,col="red",type="l",
+            ylim=range(long.data$skalo.true,na.rm=T),
+            xlim=range(long.data$lr.dist.abs,na.rm=T))
+
+```
+
+Above, we built confidence intervals for the expected values of y given x. We can also build the confidence interval for y given x (prediction interval). The variance of y given x consists of the estimated error variance ($\hat{\sigma}^2$) and the standard error above. 
+
+```{r}
+predict.var <- all.se + summary(lm.out.abs)$sigma^2
+predict.se <- sqrt(predict.var)
+
+critical.value <- qt(0.975,df=lm.out.abs$df.residual)
+
+upper.bounds <- predicted + critical.value*predict.se
+lower.bounds <- predicted - critical.value*predict.se
+
+plot(long.data$skalo.true ~ long.data$lr.dist.abs,ylab="Party evaluation",xlab="Ideological distance",
+            ylim=range(long.data$skalo.true,na.rm=T),
+            xlim=range(long.data$lr.dist.abs,na.rm=T))
+abline(lm.out.abs)
+par(new=T)
+plot(x.values,upper.bounds,ann=F,xlab="",ylab="",axes=F,col="red",type="l",
+            ylim=range(long.data$skalo.true,na.rm=T),
+            xlim=range(long.data$lr.dist.abs,na.rm=T))
+par(new=T)
+plot(x.values,lower.bounds,ann=F,xlab="",ylab="",axes=F,col="red",type="l",
+            ylim=range(long.data$skalo.true,na.rm=T),
+            xlim=range(long.data$lr.dist.abs,na.rm=T))
+
+```
+
+
+
+
+
+```{r}
+knitr::knit_exit()
+```
+
+
+
+
+
+```{r}
+
+this.dat <- long.data[long.data$party==1,]
+
+time.ten <- floor(this.dat$time/20)
+
+p.est <- tapply(this.dat$skalo,as.factor(time.ten),mean)
+
+this.func <- function(x) {
+  out <- ci.sample.mean(x)
+  out <- c(out$lower.b,out$upper.b)
+  }
+
+int.est <- tapply(this.dat$skalo,as.factor(time.ten),this.func)
+
+int.est
+
+plot(p.est ~ as.numeric(names(p.est)))
+
+
+table(time.ten)
+
+```
 

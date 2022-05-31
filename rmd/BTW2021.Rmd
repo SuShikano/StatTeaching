@@ -119,6 +119,10 @@ union.pr[is.na(union.pr)] <- csu.pr[is.na(union.pr)]
 
 union.pr <- union.pr*100/valid
 
+spd.pr <- result21[,grep("Sozialdemokratische Partei Deutschlands Zweitstimmen",names(result21))]
+spd.pr <- spd.pr *100/valid
+
+
 gru.pr <- result21[,grep("BUeNDNIS 90/DIE GRUeNEN Zweitstimmen",names(result21))]
 gru.pr <- gru.pr *100/valid
 
@@ -599,4 +603,445 @@ text(LM,0.05,
 ```
 
 Accordingly, you can obtain the same result of the above F-test.
+
+## Using logarithm 
+
+Recall the following regression model:
+
+```{r}
+gdp.tsd <- gdp/1000
+
+srm.out <- lm(afd.pr ~ gdp.tsd)
+summary(srm.out)
+
+plot(gdp.tsd,afd.pr,xlab="GDP per capita (TSD)",ylab="AfD (%)")
+abline(srm.out)
+
+```
+
+The joint distribution of both variables shows certain outlier districts whose GDP is very high.
+
+In such cases, one can consider to transform the variable by using the logartihmic function.
+
+```{r}
+
+gdp.tsd.log <- log(gdp.tsd)
+
+par(mfrow=c(1,2))
+
+hist(gdp.tsd,
+     main="GDP (in TSD Euro)",xlab="",
+     freq=FALSE)
+
+hist(gdp.tsd.log,
+     main="GDP (logarithmized",xlab="",
+     freq=FALSE)
+
+```
+
+```{r}
+srm.out.2 <- lm(afd.pr ~ gdp.tsd.log)
+summary(srm.out.2)
+
+plot(gdp.tsd.log,afd.pr,xlab="GDP per capita (TSD, log)",ylab="AfD (%)")
+abline(srm.out.2)
+
+```
+
+To interpret the slope coefficient of a logarithmized variable is tricky. According to the regression result above, unit increase of log GDP is associated with increase of `r coef(srm.out.2)[2]`. However, a unit increase of the log GDP is not constant on the scale of the raw GDP.
+
+To see what a unit increase of the log GDP means, we can first check the logarithm function.
+
+```{r}
+curve(log,0,70,axes=F)
+axis(1,at=exp(seq(0,5)),
+     c("",round(exp(seq(1,5)),2))
+     )
+axis(2,at=seq(0,5))
+
+for (i in 1:4){
+  lines(c(0,exp(i)),rep(i,2),lty=2)
+  lines(rep(exp(i),2),c(0,i),lty=2)
+}
+
+```
+
+Note that the opposite function of log() is the exponential function (exp()). To solve e.g. log(x)=2 for x, we can calculate just exp(2)=`r exp(2)`.
+
+The above figure clearly demonstrates that increase from log(2) to log(3) and that from log(3) to log(4) correspond different increase in the raw scale. If you however take the growth, it is constant. That is:
+
+- exp(3)/exp(2) = `r round(exp(3),2)`/`r round(exp(2),2)` = `r exp(3)/exp(2)`
+- exp(4)/exp(3) = `r round(exp(4),2)`/`r round(exp(3),2)` = `r exp(4)/exp(3)`
+
+That is, we can interpret the coefficient of the log GDP (`r coef(srm.out.2)[2]`) as change in Y given X grows constantly. More specifically, given a district's GDP is 1% higher, the the AfD share will change with `r coef(srm.out.2)[2]`/100.
+
+
+Consequently, the result will not change if we take the log of GDP in Euro instead of in thousand Euro:
+
+```{r}
+gdp.log <- log(gdp)
+
+head(cbind(gdp,gdp.log,gdp.tsd,gdp.tsd.log),n=10)
+
+
+summary(srm.out.3 <- 
+          lm(afd.pr ~ gdp.log))
+
+```
+
+Thus far, we logarithmized the independent variable, but the distribution of the dependent variable also has some outliers.
+
+```{r}
+afd.pr.log <- log(afd.pr)
+
+par(mfrow=c(1,2))
+
+hist(afd.pr,
+     main="AfD vote share",xlab="",
+     freq=FALSE)
+
+hist(afd.pr.log,
+     main="AfD vote share (logarithmized)",xlab="",
+     freq=FALSE)
+```
+
+
+
+```{r}
+
+srm.out.4 <- lm(afd.pr.log ~ gdp.tsd.log)
+summary(srm.out.4)
+
+
+```
+
+Having learned about the properties of logarithmized variables, the interpretation of this result is now straighforward. The estimated slope give information about what growth for AfD vote share in a district we expect for one-percent growth of the district's GDP.
+
+
+In this model, the percentage change of AfD vote share for the percent change of GDP is constant: $\frac{\% \Delta y}{\% \Delta x} = \beta_1$. This is called elasticity (see Appendix A) and the model above is called the constant elasticity model.
+
+Elasticity of y in respect to x: $\frac{\% \Delta y}{\% \Delta x}$.
+
+
+
+Besides reducing the effect of outliers on the estimated results, using logarithmized variables has another important advantage. To see this, we compare the joint distributions based on the raw variables and logarithmized variables:
+
+
+```{r}
+par(mfrow=c(1,2))
+
+plot(gdp.tsd,afd.pr,xlab="GDP per capita (TSD)",ylab="AfD (%)")
+abline(srm.out)
+
+plot(gdp.tsd.log,afd.pr.log,xlab="GDP per capita (TSD, log)",ylab="AfD (%, log)")
+abline(srm.out.4)
+
+```
+
+
+In the left-hand panel, the joint distribution seems to violate a series of the GM-assumptions such like linearity, zero conditional mean and heteroskedasticity. In the right-hand panel with the logarithmized variables, the joint distribution seems to be more conform with the GM-assumptions. 
+
+
+```{r}
+par(mfrow=c(1,2))
+
+hist(srm.out$residuals,xlab="Residuals",main="Both in the raw scale",
+     freq=F)
+
+hist(srm.out.4$residuals,xlab="Residuals",main="Both logarithmized",
+     freq=F)
+
+```
+
+The distributions of the residuals also shows that the model with the logarithmized dependent and independent variables much better resembles the normal distribution, even though it is not perfect.
+
+
+
+Above, we have already seen that the logarithm function and the exponential function are the opposite function to each other. 
+
+
+
+Therefore, $\ln(y) = \beta_0 + \beta_1 x + u$ is equivalent to $y = \exp(\beta_0 + \beta_1 x + u)$. Consider the following model:
+
+```{r, echo = TRUE}
+srm.out.5 <- lm(afd.pr.log ~ gdp.tsd)
+summary(srm.out.5)
+```
+
+
+This result can be visualized as follows:
+
+```{r}
+x.values <- seq(min(gdp.tsd),max(gdp.tsd),length=100)
+predicted <- exp(coefficients(srm.out.5)[1] + coefficients(srm.out.5)[2]*x.values)
+
+par(mfrow=c(1,2))
+plot(gdp.tsd,log(afd.pr),
+     xlim=range(gdp.tsd),ylim=range(log(afd.pr)),
+     xlab="GDP per capita (TSD)",ylab="Log of AfD (%)")
+abline(srm.out.5)
+
+plot(gdp.tsd,afd.pr,
+     xlim=range(gdp.tsd),ylim=range(afd.pr),
+     xlab="GDP per capita (TSD)",ylab="AfD (%)")
+par(new=T)
+plot(x.values,predicted,type="l",
+     xlim=range(gdp.tsd),ylim=range(afd.pr),
+     axes=F,ann=F,xlab="",ylab="")
+```
+
+The right hand side panel is based on the raw scales. Correspondingly, the predicted value was transformed by the exponential function. This predicted values, however, are systematically underestimated and biased. This is because the estimated residuals do not have unit mean ($exp(0)=1$) after exponentiation:
+
+
+
+```{r}
+par(mfrow=c(1,2))
+hist((srm.out.5$residuals),main=paste("Mean:", round(mean(srm.out.5$residuals),3)),xlab="residuals")
+hist(exp(srm.out.5$residuals),main=paste("Mean:", round(mean(exp(srm.out.5$residuals)),3)),xlab="exp(residuals)")
+```
+
+Under the CLM-assumptions, therefore, we have to correct that bias by using the average exponentiated residuals:
+
+
+```{r}
+alpha.0.hat <- mean(exp(srm.out.5$residuals))
+
+correct.predicted <- alpha.0.hat*predicted
+
+
+par(mfrow=c(1,2))
+plot(gdp.tsd,log(afd.pr),
+     xlim=range(gdp.tsd),ylim=range(log(afd.pr)),
+     xlab="GDP per capita (TSD)",ylab="Log of AfD (%)")
+abline(srm.out.5)
+
+plot(gdp.tsd,afd.pr,
+     xlim=range(gdp.tsd),ylim=range(afd.pr),
+     xlab="GDP per capita (TSD)",ylab="AfD (%)")
+par(new=T)
+plot(x.values,predicted,type="l",
+     xlim=range(gdp.tsd),ylim=range(afd.pr),
+     axes=F,ann=F,xlab="",ylab="")
+par(new=T)
+plot(x.values,correct.predicted,type="l",
+     xlim=range(gdp.tsd),ylim=range(afd.pr),col="red",
+     axes=F,ann=F,xlab="",ylab="")
+
+```
+
+The red line in the right-hand panel is corrected prediction ($\hat\alpha_0 \exp(\beta_0 + \beta_1 x)$). They would never be negative. 
+
+
+
+
+
+## Models with Quadratics/Interaction Terms
+
+
+Suppose we are interested in the relationship between AfD vote share and the youth unemployment rate. 
+
+
+First, we can observe the joint distribution.
+
+```{r}
+plot(unemp.young,afd.pr)
+```
+
+Subsequently, we can regress the AfD share on the unemployment rate:
+
+```{r}
+srm.out <- lm(afd.pr ~ unemp.young)
+summary(srm.out)
+
+```
+
+There seems to be a positive effect of the unemployment rate on the SPD vote share.
+
+
+```{r}
+plot(unemp.young,afd.pr,xlab="Unemployment (%)",ylab="AfD percentage")
+abline(srm.out)
+```
+
+At the same time, there seems to be a curve-linear relationship. To test this, we add the quadratic term to the regression:
+
+```{r}
+unemployment.qrd <- unemp.young^2
+
+quadratics.out <- lm(afd.pr ~ unemp.young + unemployment.qrd)
+summary(quadratics.out)
+
+```
+
+The result shows a curve linear relationship.
+
+```{r}
+# make predition
+xvalues <- seq(min(unemp.young),max(unemp.young),length=100)
+predicted <- coefficients(quadratics.out)[1] + 
+             coefficients(quadratics.out)[2]*xvalues + 
+             coefficients(quadratics.out)[3]*(xvalues^2)  
+
+# plot
+plot(unemp.young,afd.pr,xlab="Unemployment (%)",ylab="AfD percentage",ylim=range(afd.pr))
+abline(srm.out)
+par(new=T)
+plot(xvalues,predicted,type="l",axes=F,ann=F,xlab="",ylab="",
+     ylim=range(afd.pr),col="blue")
+
+```
+
+However, the quadratic term is not significant and if one compare both models by using F-statistic, the curve linear model is not superior to the simple linear model.
+
+Still, in the mid of x-value range, the data tend to have positive residuals than the other ranges. Now, we take another approach with an interaction term. That is, we assume the effect of unemployment can vary depending on another independent variable "West or East Germany".
+
+
+```{r}
+bundesland <- sociodem[,"Land"]
+east.index <- c(grep("Mecklenburg",bundesland),
+                grep("Brandenburg",bundesland),
+                grep("Sachsen",bundesland),
+                grep("ringen",bundesland))
+
+east.dummy <- rep(0,length(bundesland))
+east.dummy[east.index] <- 1
+
+interaction.out <- lm(afd.pr ~ unemp.young*east.dummy)
+summary(interaction.out)
+
+```
+
+The result is better interpreted by visualizing it:
+
+```{r}
+reg.coef.west <- coefficients(interaction.out)[c(1,2)]
+reg.coef.east <- coefficients(interaction.out)[c(1,2)] + coefficients(interaction.out)[c(3,4)]
+
+# plot
+plot(unemp.young[east.dummy==0],afd.pr[east.dummy==0],
+     xlab="Unemployment (%)",ylab="AfD percentage",
+     col="green",pch=19,
+     xlim=range(unemp.young),ylim=range(afd.pr))
+par(new=T)
+plot(unemp.young[east.dummy==1],afd.pr[east.dummy==1],
+     col="red",pch=19,
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(unemp.young),ylim=range(afd.pr))
+abline(srm.out)
+par(new=T)
+#plot(xvalues,predicted,type="l",axes=F,ann=F,xlab="",ylab="",
+#     ylim=range(afd.pr),col="blue")
+abline(reg=reg.coef.west,col="green",lty=1)
+abline(reg=reg.coef.east,col="red",lty=1)
+legend("topright",lty=1,col=c("green","red"),
+       c("West","East"),
+       bty="n"
+)
+```
+
+Suprizingly, the positive effect of youth unemployment above was due to the heterogeneity of West and East German districts. According to the current model with the interaction, yourh unemployment has no significant result in West and even a significant negative effect in East.
+
+
+The effect of unemployment can depend on further factors, e.g. the GDP level:
+
+```{r}
+interaction.2.out <- lm(afd.pr ~ unemp.young * gdp.tsd)
+summary(interaction.2.out)
+
+```
+
+The partial effect of the unemployment rate on the AfD vote share is $2.85499 -0.06203 \times gdp.tsd$. By considering the range of the GDP (in Tsd), we can obtain the range of the partial effect:
+
+```{r}
+range.gdp.tsd <- range(gdp.tsd)
+range.gdp.tsd
+
+range.partial.effect <- coefficients(interaction.2.out)[2] +                  
+                        coefficients(interaction.2.out)[4]*range.gdp.tsd  
+range.partial.effect
+```
+
+For better interpretation, we can reparametrize the model:
+
+```{r}
+unemployment.center <- unemp.young-mean(unemp.young)
+gdp.tsd.center <- gdp.tsd - mean(gdp.tsd)
+
+interaction.3.out <- lm(spd.pr ~ unemp.young + gdp.tsd + 
+                          unemployment.center:gdp.tsd.center)
+summary(interaction.3.out)
+
+```
+
+The main effect of the unemployment rate corresponds to the partial effect of the unemployment rate if the GDP in Tsd is its average value:
+
+```{r}
+coefficients(interaction.2.out)[2] +                  
+                        coefficients(interaction.2.out)[4]*mean(gdp.tsd)
+```
+
+
+
+
+
+
+
+```{r}
+knitr::knit_exit()
+```
+
+
+
+
+
+
+Further, the percentage change in AfD vote share is constant for one unit increase of GDP: $\frac{\% \Delta y}{\Delta x} = 100 \beta_1$. This is called semi-elasticity (see Appendix A).
+
+Percentage change: $\% \Delta y = 100 \frac{\Delta y}{y_0}$.
+
+
+Recall another model:
+
+```{r, echo = TRUE}
+srm.out <- lm(log(afd.pr) ~ log(gdp.tsd))
+summary(srm.out)
+```
+
+
+This will look like as follows:
+
+```{r}
+x.values <- seq(min(gdp.tsd),max(gdp.tsd),length=100)
+predicted <- exp(coefficients(srm.out)[1] + coefficients(srm.out)[2]*log(x.values))
+alpha.0.hat <- mean(exp(srm.out$residuals))
+correct.predicted <- alpha.0.hat*predicted
+
+
+par(mfrow=c(1,2))
+plot(log(gdp.tsd),log(afd.pr),
+     xlim=range(log(gdp.tsd)),ylim=range(log(afd.pr)),
+     xlab="Log of GDP per capita (TSD)",ylab="Log of AfD (%)")
+abline(srm.out)
+
+plot(gdp.tsd,afd.pr,
+     xlim=range(gdp.tsd),ylim=range(afd.pr),
+     xlab="GDP per capita (TSD)",ylab="AfD (%)")
+par(new=T)
+plot(x.values,predicted,type="l",
+     xlim=range(gdp.tsd),ylim=range(afd.pr),
+     axes=F,ann=F)
+par(new=T)
+plot(x.values,correct.predicted,type="l",
+     xlim=range(gdp.tsd),ylim=range(afd.pr),col="red",
+     axes=F,ann=F)
+
+```
+
+In this model, the percentage change of AfD vote share for the percent change of GDP is constant: $\frac{\% \Delta y}{\% \Delta x} = \beta_1$. This is called elasticity (see Appendix A) and the model above is called the constant elasticity model.
+
+Elasticity of y in respect to x: $\frac{\% \Delta y}{\% \Delta x}$.
+
+
+
+
 
