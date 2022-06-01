@@ -58,7 +58,7 @@ CLM.samples <- data.generation(sample.size=sample.size,
 
 As stated above, the data above was generated based on two independent variables whose correlation is zero in the population. 
 
-We can estimate the following two regression models $$\hat y = \tilde \beta_0 + \tilde \beta_1 x_1$$ and $$\hat y = \hat \beta_0 + \hat \beta_1 x_1$$ and compare both slope estimates.
+We can estimate the following two regression models $$\hat y = \tilde \beta_0 + \tilde \beta_1 x_1$$ and $$\hat y = \hat \beta_0 + \hat \beta_1 x_1 + \hat \beta_2 x_2$$ and compare both slope estimates.
 
 
 ```{r}
