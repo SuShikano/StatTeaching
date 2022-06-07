@@ -777,6 +777,341 @@ plot(x.values,lower.bounds,ann=F,xlab="",ylab="",axes=F,col="red",type="l",
 
 
 
+## Including dummy variables of parties as predictors
+
+To see whether the ideological distance affects party evaluation, we have already estimated the following model for many times:
+
+```{r }
+summary(lm.out.abs <- lm(skalo.true ~ lr.dist.abs,data=long.data))
+
+
+plot(long.data$skalo.true ~ long.data$lr.dist.abs,
+     xlab="Ideological Distance (abs)",
+     ylab="Like/Dislike (true value)")
+abline(lm.out.abs)
+
+```
+
+While we have evaluation of 7 different parties in the data set, the model above assumes the same relationship between the ideological distance and party evaluation for all parties. In other words, the intercept and slope (and errors) are common for all parties. This is a quite restricted assumption. It is more reasonable to assume that the intercept varies among parties. It is because there can be various factors behind evaluation of different parties, which can result in different intercepts. The intercept is in our context the average evaluation of a party for the respondents with the same ideological position of the party at stake.
+
+To do this, we can first create dummy variables for individual parties:
+
+```{r}
+
+long.data$dummy.cdu <- ifelse(long.data$party==1,1,0)
+long.data$dummy.csu <- ifelse(long.data$party==2,1,0)
+long.data$dummy.spd <- ifelse(long.data$party==3,1,0)
+long.data$dummy.gru <- ifelse(long.data$party==4,1,0)
+long.data$dummy.fdp <- ifelse(long.data$party==5,1,0)
+long.data$dummy.afd <- ifelse(long.data$party==6,1,0)
+long.data$dummy.lin <- ifelse(long.data$party==7,1,0)
+
+# check the dummy variable
+
+head(long.data,n=10)
+
+```
+
+Now we can check whether evaluation of CDU is different from that of the other parties:
+
+```{r}
+summary(lm.out.cdu <- lm(skalo.true ~ lr.dist.abs + dummy.cdu,data=long.data))
+
+```
+
+The results can be visualized as follows:
+
+```{r}
+
+plot(long.data$skalo.true ~ long.data$lr.dist.abs,
+     xlab="Close <- -> Distant",ylab="Dislike <-  -> Like",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+abline(lm.out.abs,     lty=2,lwd=1)
+
+predicted.cdu.0 <- coef(lm.out.cdu)[1] + coef(lm.out.cdu)[2]*c(0:10)
+predicted.cdu.1 <- coef(lm.out.cdu)[1] + coef(lm.out.cdu)[2]*c(0:10) + coef(lm.out.cdu)[3]
+
+par(new=T)
+plot(predicted.cdu.0 ~ c(0:10),col="grey",type="l",
+     ann=F,xlab="",ylab="",axes=F,
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.cdu.1 ~ c(0:10),col="orange",type="l",
+     ann=F,xlab="",ylab="",axes=F,
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+legend("topright",col=c("black","orange","gray"),
+       lty=c(2,1,1),c("All parties","CDU","Other parties"),
+       bty="n")
+
+
+```
+
+We can find the intercept for CDU is slightly lower than the other parties. Its difference is however so small that it can be due to by chance.
+
+We can now extend the model with the intercept for CSU:
+
+
+```{r}
+
+summary(lm.out.cdu.csu <- lm(skalo.true ~ lr.dist.abs + 
+           dummy.cdu + dummy.csu ,
+           data=long.data))
+
+```
+
+```{r}
+
+plot(long.data$skalo.true ~ long.data$lr.dist.abs,
+     xlab="Close <- -> Distant",ylab="Dislike <-  -> Like",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+abline(lm.out.abs,     lty=2,lwd=1)
+
+predicted.others <- coef(lm.out.cdu.csu)[1] + coef(lm.out.cdu.csu)[2]*c(0:10)
+predicted.cdu <- coef(lm.out.cdu.csu)[1] + coef(lm.out.cdu.csu)[2]*c(0:10) + coef(lm.out.cdu.csu)[3]
+predicted.csu <- coef(lm.out.cdu.csu)[1] + coef(lm.out.cdu.csu)[2]*c(0:10) + coef(lm.out.cdu.csu)[4]
+
+par(new=T)
+plot(predicted.others ~ c(0:10),col="grey",type="l",
+     ann=F,xlab="",ylab="",axes=F,
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.cdu ~ c(0:10),col="orange",type="l",
+     ann=F,xlab="",ylab="",axes=F,
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.csu ~ c(0:10),col="cyan",type="l",
+     ann=F,xlab="",ylab="",axes=F,
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+
+legend("topright",col=c("black","orange","cyan","gray"),
+       lty=c(2,1,1,1),c("All parties","CDU","CSU","Other parties"),
+       bty="n")
+
+```
+
+Here, the CSU's intercept is lower than the other parties and it is significant at 5% level.
+
+To obtain the intercept for all parties, you regress the party evaluation on the left-right distance and all party dummy variables:
+
+
+```{r}
+
+summary(lm.out.all <- lm(skalo.true ~ lr.dist.abs + 
+           dummy.cdu + dummy.csu + dummy.spd +
+             dummy.gru + dummy.fdp + dummy.afd + dummy.lin,
+           data=long.data))
+
+```
+
+The effect of the dummy variable for the Linke was not estimated. This is due to the perfect collinearity (the dummy variable trap). What is happening here can be seen in the following plot:
+
+
+
+```{r}
+
+plot(long.data$skalo.true ~ long.data$lr.dist.abs,
+     xlab="Close <- -> Distant",ylab="Dislike <-  -> Like",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+abline(lm.out.abs,     lty=2,lwd=2)
+
+predicted.others <- coef(lm.out.all)[1] + coef(lm.out.all)[2]*c(0:10)
+predicted.cdu <- coef(lm.out.all)[1] + coef(lm.out.all)[2]*c(0:10) + coef(lm.out.all)[3]
+predicted.csu <- coef(lm.out.all)[1] + coef(lm.out.all)[2]*c(0:10) + coef(lm.out.all)[4]
+predicted.spd <- coef(lm.out.all)[1] + coef(lm.out.all)[2]*c(0:10) + coef(lm.out.all)[5]
+predicted.gru <- coef(lm.out.all)[1] + coef(lm.out.all)[2]*c(0:10) + coef(lm.out.all)[6]
+predicted.fdp <- coef(lm.out.all)[1] + coef(lm.out.all)[2]*c(0:10) + coef(lm.out.all)[7]
+predicted.afd <- coef(lm.out.all)[1] + coef(lm.out.all)[2]*c(0:10) + coef(lm.out.all)[8]
+predicted.lin <- coef(lm.out.all)[1] + coef(lm.out.all)[2]*c(0:10) + coef(lm.out.all)[9]
+
+par(new=T)
+plot(predicted.others ~ c(0:10),col="grey",type="l",
+     ann=F,xlab="",ylab="",axes=F,
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.cdu ~ c(0:10),col="orange",type="l",
+     ann=F,xlab="",ylab="",axes=F,
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.csu ~ c(0:10),col="cyan",type="l",
+     ann=F,xlab="",ylab="",axes=F,
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.spd ~ c(0:10),col="red",type="l",
+     ann=F,xlab="",ylab="",axes=F,
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.gru ~ c(0:10),col="green",type="l",
+     ann=F,xlab="",ylab="",axes=F,
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.fdp ~ c(0:10),col="yellow",type="l",
+     ann=F,xlab="",ylab="",axes=F,
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.afd ~ c(0:10),col="blue4",type="l",
+     ann=F,xlab="",ylab="",axes=F,
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.lin ~ c(0:10),col="pink",type="l",
+     ann=F,xlab="",ylab="",axes=F,
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+
+legend("topright",col=c("black","orange","cyan","red","green","yellow","blue4","pink","gray"),
+       lty=c(2,rep(1,8)),c("All parties","CDU","CSU","SPD","Greens","FDP","AfD","Linke",
+                        "Other parties"),
+       lwd=c(2,rep(1,8)),
+       bty="n")
+
+```
+
+In the figure, you can see the regression lines for all parties except for the Linke. However, you see the gray line for the others. And this corresponds to the regression line for the linke. 
+
+The equivalent model can be also estimated as follows:
+
+
+```{r}
+summary(lm.out.all2 <- lm(skalo.true ~ lr.dist.abs + as.factor(party),data=long.data))
+
+```
+
+In this model, the effect of the CDU-dummy was dropped. But the result is completely equivalent to the last model.
+
+
+Now, we can observe the residuals to check the zero conditional mean:
+
+```{r}
+par(mfrow=c(1,2))
+resid.1 <- residuals(lm.out.abs)
+plot(resid.1 ~ long.data$lr.dist.abs,
+     ylim=range(resid.1),xlim=c(0,10),
+     ylab="Residuals",xlab="Distance",
+     main="Model without party dummies")
+E.u <- tapply(resid.1,as.factor(long.data$lr.dist.abs),mean)
+par(new=T)
+plot(E.u ~ c(0:10),
+     ylim=range(resid.1),xlim=c(0,10),
+     type="l",col="red",ann=F,xlab="",ylab="",axes=F)
+abline(h=0,lty=2)
+
+resid.5 <- residuals(lm.out.all2)
+plot(resid.5 ~ long.data$lr.dist.abs,
+     ylab="Residuals",xlab="Distance",
+     main="Model with party dummies")
+E.u <- tapply(resid.5,as.factor(long.data$lr.dist.abs),mean)
+par(new=T)
+plot(E.u ~ c(0:10),
+     ylim=range(resid.5),xlim=c(0,10),
+     type="l",col="red",ann=F,xlab="",ylab="",axes=F)
+abline(h=0,lty=2)
+
+```
+
+Here, we still have a problem in the range for large ideological distance values.
+
+## 7.4 Interactions involving dummy variables
+
+
+Let's come back to the first model with the dummy variable for CDU evaluation:
+
+```{r}
+summary(lm.out.cdu)
+
+
+```
+
+While we estimated different intercepts for the evaluation of CDU and the other parties in the above model, we further assumed that the effect of the ideological distance is same for all parties. It is however not nescessarily true. The ideological distance can have different impacts on the evaluation of CDU and the other parties. To check this, we include now the interaction effect of both variables:
+
+```{r}
+
+
+summary(lm.out.cdu.int <- lm(skalo.true ~ lr.dist.abs * dummy.cdu,data=long.data))
+
+```
+
+
+This result is a bit tricky to interpret as you have already seen in a previous section. In the previous section, we visualized the results for ease of interpretation. This time, we conduct two separate regression analysis for CDU evaluation and the other evaluations. First we divide the dataset:
+
+```{r}
+cdu.dat <- long.data[long.data$party==1,]
+non.cdu.dat <- long.data[long.data$party!=1,]
+
+```
+
+Subsequently, the simple regression model is estimated for the CDU evaluation...
+
+```{r}
+summary(lm.out.onlycdu <- lm(skalo.true ~ lr.dist.abs,data = cdu.dat))
+
+```
+
+... and the others.
+
+```{r}
+summary(lm.out.onlynoncdu <- lm( skalo.true ~ lr.dist.abs,data = non.cdu.dat))
+
+```
+
+The point estimates of both separate regression can be found in the first model, while the other elements (standard errors, degrees of freedom) are not always identical.
+
+
+Now, we wish to test whether both regression models systematically differ from each other. The null-hypothesis is that both models are based on the same population model, which corresponds to the first model estimated without any interaction terms. We call the latter model the pooled model since it pools both groups into one dataset.
+
+Here, the separated models constitute together an unrestricted model while the pooled model is restricted since we restrict the effects of both independent variables being same for both groups.
+
+This can be tested by F-statistic (which is called "Chow statistic"):
+
+$F = \frac{SSR_P - (SSR_1 + SSR_2)/(k+1)}{(SSR_1 + SSR_2)/[n-2(k+1)]}$
+
+```{r}
+SSR.p <- sum(lm.out.abs$residuals^2)
+SSR.1 <- sum(lm.out.onlycdu$residuals^2)
+SSR.2 <- sum(lm.out.onlynoncdu$residuals^2)
+k <- 2
+
+sum.df <- lm.out.onlycdu$df.residual+lm.out.onlynoncdu$df.residual
+
+
+F <- ((SSR.p - (SSR.1+SSR.2))/(k+1))/((SSR.1+SSR.2)/(sum.df))
+F
+
+```
+
+```{r, echo = FALSE}
+
+x.scale <- seq(0,10,by=0.01)
+this.y <- df(x.scale,df1=k+1,df2=sum.df)
+
+plot(x.scale,this.y,type="l",xlab="t",ylab="Density",
+       main=paste("F-distribution with df=",k+1,"and",sum.df))
+
+this.95 <- qf(c(.95),df1=k+1,df2=sum.df)
+abline(v=this.95,lty=2)
+text(1,0.2,"95%")
+text(this.95,0,pos=2,round(this.95,3))
+text(this.95,0.2,"Rejection region",pos=4)
+
+``` 
+
+We can not reject here the null-hypothesis. 
+
+
+
 
 ```{r}
 knitr::knit_exit()
