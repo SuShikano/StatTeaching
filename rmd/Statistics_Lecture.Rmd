@@ -1,0 +1,194 @@
+---
+title: "Linear Probability Modells"
+author: "Susumu Shikano"
+date: "Last compiled at `r format(Sys.Date(), '%d. %B %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+We read the data of from the statistics lecture in the past. Note that this data is based on the real data of the statistics lecture, but it is a random sample.
+
+```{r}
+
+# Setting the working directory where the data file is stored.
+load(file="data/Statistics_Exam_Anonymous.RData")
+
+
+```
+
+
+We first create the binary variable whether individual students passed the exam.
+
+
+```{r}
+
+exam.anonym$passed <- ifelse(exam.anonym$points>=50,1,0)
+
+table(exam.anonym$passed)
+
+```
+
+We regress the created binary variable on the number of worksheets submitted.
+
+
+```{r}
+
+summary(lpm.out <- lm(passed ~ worksheet_submitted,data=exam.anonym))
+
+```
+
+
+
+
+```{r}
+plot(jitter(exam.anonym$passed,amount=0.05) ~ exam.anonym$worksheet_submitted,
+     xlab="Number of worksheets submitted",ylab="Failed <- -> Passed")
+abline(lpm.out)
+```
+
+Note that our dependent variable can take only two possible values (0 or 1). How can we interpret this result? 
+
+Under the zero conditional mean assumption:
+
+$E(y|x) = \beta_0 + \beta_1 no.worksheets$
+
+This expected value can be interpreted as $\Pr(y=1|x)$.
+
+Therefore: $\Delta \Pr(y=1|x) = \beta_1 \Delta no.worksheets$.
+
+There are two potential drawbacks:
+
+- Predicted value for y can be larger than 1 or smaller than 0.
+- The constant linear probability change depending on x may be problematic.
+- Violation of the homoskedasticity assumption (for more details see Chapter 8).
+
+The first problem is the case in the above example:
+
+```{r}
+hist(lpm.out$fitted.values,main="Predicted values")
+```
+
+For some respondents, we predicted values larger than 1.
+
+To avoid this problem, we can make the prediction based on the following rule:
+
+$\tilde{y}= 1$ if $\hat{y} \ge 0.5$ and $\tilde{y}= 0$ otherwise. In the above example:
+
+
+```{r}
+predicted.y <- ifelse(lpm.out$fitted.values>=0.5,1,0)
+observed.y <- exam.anonym$passed
+
+mean(predicted.y==observed.y)
+
+```
+
+We correctly predicted `r round(mean(predicted.y==observed.y)*100,1)`% of observations (**percent correctly predicted**). However, we look at the contingency table of the observed and predicted values: 
+
+```{r}
+table(predicted.y,observed.y)
+```
+
+Most of the respondents (`r round(mean(predicted.y)*100,2)`%) were predicted to pass (i.e. $\hat y=1$).
+
+
+
+
+## Heteroskedasticity
+
+The linear probability model must contain heteroskedasticity (except $\beta_j=0$ for all j):
+
+$Var(y|x)=p(x)[1-p(x)]$ with $p(x)=\beta_0 + \beta_1 x_1 +...+\beta_k x_k$.
+
+```{r}
+var.function <- function(p) p*(1-p)
+curve(var.function,0,1,xlab="p(x)",ylab="Var(y)")
+
+```
+
+
+Two possible remedies: 
+
+- OLS-estimates + robust standard errors.
+- WLS-estimates with the weights $\hat{h} = \hat{y}(1-\hat{y})$.
+
+
+We can apply these remedies to the LPM estimated above:
+
+
+```{r}
+summary(lpm.out)
+
+
+plot(jitter(exam.anonym$passed,amount=0.05) ~ exam.anonym$worksheet_submitted,
+     xlab="Number of worksheets submitted",ylab="Failed <- -> Passed")
+abline(lpm.out)
+```
+
+
+The (heteroskedasticity-) robust standard error is:
+
+```{r}
+var.slope.lpm.het <- sum((exam.anonym$worksheet_submitted - mean(exam.anonym$worksheet_submitted))^2*(lpm.out$residuals^2))/((sum((exam.anonym$worksheet_submitted - mean(exam.anonym$worksheet_submitted))^2))^2)
+
+var.slope.lpm.het
+sqrt(var.slope.lpm.het)
+```
+
+The WLS estimates are:
+
+```{r, error=TRUE}
+predicted <- lpm.out$fitted.values
+h.hat <- predicted * (1-predicted)
+
+wls.lpm.out <- lm(passed ~ worksheet_submitted,data=exam.anonym,
+                  weights = 1/h.hat)
+summary(wls.lpm.out)
+```
+
+This does not work since some predicted values are not in the range $(0,1)$. 
+
+
+```{r}
+predicted <- lpm.out$fitted.values
+hist(predicted)
+```
+
+
+The figure shows that some predictions exceeds 1. This makes $\hat{h}$ negative values, which cannot be used as weight.
+
+
+One possibility is to adjust those predicted values. We can replace the predicted values above 1 with 0.99:
+
+
+
+```{r}
+predicted <- lpm.out$fitted.values
+predicted[predicted>=1] <- 0.99
+
+h.hat <- predicted * (1-predicted)
+
+wls.lpm.out <- lm(passed ~ worksheet_submitted,data=exam.anonym,
+                  weights = 1/h.hat)
+summary(wls.lpm.out)
+```
+
+The replaced value 0.99 was arbitrarily chosen. We can also use 0.999:
+
+
+```{r}
+predicted <- lpm.out$fitted.values
+predicted[predicted>=1] <- 0.999
+
+h.hat <- predicted * (1-predicted)
+
+wls.lpm.out <- lm(passed ~ worksheet_submitted,data=exam.anonym,
+                  weights = 1/h.hat)
+summary(wls.lpm.out)
+```
+
+Here, the result became completely different since we have a significant amount of predicted values outside of $(0,1)$. In such cases, we should better use the heteroskedasticity-robust statistics.
