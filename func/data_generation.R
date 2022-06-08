@@ -74,8 +74,12 @@ data.generation <- function(sample.size=100,
       y <- y.hat + error
     }
 
-    this.dat <- as.data.frame(cbind(y,X,error))
-    
+    if (binary.y){
+      this.dat <- as.data.frame(cbind(y,X,y.hat))
+    }else{
+      this.dat <- as.data.frame(cbind(y,X,error))
+    }
+
     generated.data[[i.sim]]  <- this.dat
   }
   
