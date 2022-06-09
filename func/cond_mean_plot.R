@@ -13,10 +13,12 @@ cond.mean.plot <- function(x=NULL,
                            perc=95,
                            xlab="X",
                            ylab="Y",
-                           num.X=25
+                           num.X=25,
+                           cond.var =FALSE
 ){
 
 source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/ci_sample_mean.R")  
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/naive_var.R")    
   
 y.range <- range(y,na.rm=T)
 x.range <- range(x,na.rm=T)
@@ -32,10 +34,17 @@ for (i in 1:length(conditional.mean)){
   
   selected.y <- y[(x> (x.values[i]-x.interval)) & 
                   (x <(x.values[i]+x.interval)) ]
-  conditional.mean[i] <- mean(selected.y)
-  this.ci <- ci.sample.mean(selected.y)
-  lower.b[i] <- this.ci$lower.b
-  upper.b[i] <- this.ci$upper.b
+  if (cond.var) {
+    conditional.mean[i] <- naive.var(selected.y)
+    lower.b[i] <- conditional.mean[i]
+    upper.b[i] <- conditional.mean[i]
+  } else {
+    conditional.mean[i] <- mean(selected.y)
+    
+    this.ci <- ci.sample.mean(selected.y)
+    lower.b[i] <- this.ci$lower.b
+    upper.b[i] <- this.ci$upper.b
+  }
 }
 
 par(new=T)
