@@ -57,6 +57,7 @@ data.generation <- function(sample.size=100,
     
     if (binary.y){
       # generating binary y by using Bernoulli 
+      y.hat.raw <- y.hat
       y.hat[y.hat<0] <- 0
       y.hat[y.hat>1] <- 1
       y <- rbinom(n=length(y.hat),1,prob=y.hat)
@@ -75,7 +76,7 @@ data.generation <- function(sample.size=100,
     }
 
     if (binary.y){
-      this.dat <- as.data.frame(cbind(y,X,y.hat))
+      this.dat <- as.data.frame(cbind(y,X,y.hat,y.hat.raw))
     }else{
       this.dat <- as.data.frame(cbind(y,X,error))
     }
