@@ -1,0 +1,504 @@
+---
+title: 'Chapter 8: Heteroskedasticity'
+author: "Susumu Shikano"
+date: "Last compiled at `r format(Sys.Date(), '%d. %B %Y')`"
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# loading some functions
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/data_generation.R")
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/ci_sample_mean.R")
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/cond_mean_plot.R")
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/naive_var.R")
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/naive_cov.R")
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/robust_se_srm.R")
+
+# setting some parameters
+
+num.datasets <- 1000 # number of datasets
+sample.size <- 500
+
+```
+
+## Simple regression model
+
+```{r}
+n.iv <- 1
+true.slope <- 0.4
+true.intercept <- 0.4
+
+x.mu <- 0.6
+x.Sigma <- as.matrix(0.5)
+
+true.err.var <- 0.05
+
+```
+
+
+We generate `r num.datasets` datasets with n=`r sample.size` under the GM-assumptions. The number of independent variables is `r n.iv`. The true regression line has the intercept of `r true.intercept` and the slope of `r true.slope`. The independent variables are generated with the mean `r x.mu`, variances  `r diag(x.Sigma)`.
+
+
+
+```{r}
+
+samples.srm.gm <- data.generation(sample.size=sample.size,
+                             n.sim=num.datasets,
+                             n.iv=n.iv,
+                             x.mu=x.mu,
+                             x.Sigma=x.Sigma,
+                             para=c(true.intercept,true.slope),
+                             err.dist = "normal",
+                             err.disp = true.err.var,
+                             het= FALSE,
+                             binary.y = FALSE)
+
+
+samples.srm.het <- data.generation(sample.size=sample.size,
+                             n.sim=num.datasets,
+                             n.iv=n.iv,
+                             x.mu=x.mu,
+                             x.Sigma=x.Sigma,
+                             para=c(true.intercept,true.slope),
+                             err.dist = "normal",
+                             err.disp = true.err.var,
+                             het= TRUE,
+                             het.delta = c(0.5,1.3),
+                             binary.y = FALSE)
+
+
+```
+
+
+Below, we can see a sample data generated under different assumptions. The joint distribution in the right-hand side panel demonstrates an obvious heteroskedasticity.
+
+
+```{r}
+par(mfrow=c(1,2))
+
+for (i.fig in 1:2){
+
+  if (i.fig==1) data.1 <- samples.srm.gm$generated.data[[1]]
+  if (i.fig==2) data.1 <- samples.srm.het$generated.data[[1]]
+
+  plot(data.1$X1,data.1$y,
+       xlab="X1",ylab="Y")
+  abline(reg=samples.srm.het$para,col="red")
+  abline(lm(y ~ X1 ,data=data.1))
+  legend("topleft",lty=1,col=c("red","black"),c("True","Estimate"),bty="n")
+  
+}
+
+```
+
+
+We can now estimate the regression model for each sample.
+
+```{r}
+
+all.coef <- array(NA,dim=c(num.datasets,3,2))
+all.coef.se <- array(NA,dim=c(num.datasets,3,2))
+
+for (i in 1:num.datasets){
+    this.data <- samples.srm.gm$generated.data[[i]]
+
+    lm.out <- lm(y ~ X1  ,data=  this.data)
+
+    all.coef[i,1:2,1] <- coef(lm.out)
+    all.coef[i,3,1] <- summary(lm.out)$sigma
+    all.coef.se[i,c(1:2),1] <- coef(summary(lm.out))[,2]
+    
+    all.coef.se[i,3,1] <- robust.se.srm(lm.out)
+
+    this.data <- samples.srm.het$generated.data[[i]]
+
+    lm.out <- lm(y ~ X1  ,data=  this.data)
+
+    all.coef[i,1:2,2] <- coef(lm.out)
+    all.coef[i,3,2] <- summary(lm.out)$sigma
+    all.coef.se[i,c(1:2),2] <- coef(summary(lm.out))[,2]
+    
+    all.coef.se[i,3,2] <- robust.se.srm(lm.out)
+    }
+dimnames(all.coef)[[2]] <- c("b0","b1","sigma")
+dimnames(all.coef.se)[[2]] <- c("b0","b1","robust")
+
+
+```
+
+
+Below, you can see the distribution of the point estimates:
+
+
+```{r}
+
+    x.range <- range(c(all.coef[,"b1",]))
+    plot(density.out <- density(all.coef[,"b1",1]),
+         main="",xlab=paste0("Estimates"),
+         xlim=x.range)
+    abline(v=mean(all.coef[,"b1",1]))
+    par(new=T)
+    plot(density(all.coef[,"b1",2]),ann=F,xlab="",ylab="",main="",
+         axes=F,
+         xlim=x.range,lty=2,
+         ylim=c(0,max(density.out$y)))
+    
+    sds <- c(sqrt(naive.var(all.coef[,"b1",1])),
+             sqrt(naive.var(all.coef[,"b1",2])))
+    abline(v=mean(all.coef[,"b1",2]),lty=2)
+    legend("topright",lty=c(1,NA,2,NA),
+           c("Under GM",
+           paste("SD:",round(sds[1],3)),
+           "Heteroskedasticity",
+           paste("SD:",round(sds[2],3))),bty="n")
+    
+
+```
+
+
+If one looks at the expected values, both distributions have their expected value very close to the true value (`r true.slope`). That is, the OLS estimator is unbiased independently whether the data was generated with or without homoskedasticity. 
+
+Both distribution differ in their dispersion. This is reasonable since the data under the heteroskedasticity was generated with a larger error variance $$u^2 = \sigma^2 exp(\delta_0 + \delta_1 X1 +... \delta_J X_j)$$.
+
+
+Important here is whether the standard errors obtained based on samples corresponds to the dispersion above. Below, you can see the distribution of standard errors: 
+
+
+
+
+```{r}
+
+    x.range <- range(c(all.coef.se[,"b1",]))
+    plot(density.out <- density(all.coef.se[,"b1",1]),
+         main="",xlab=paste0("Standard errors"),
+         xlim=x.range)
+    #abline(v=mean(all.coef.se[,"b1",1]))
+    par(new=T)
+    plot(density(all.coef.se[,"b1",2]),ann=F,xlab="",ylab="",main="",
+         axes=F,
+         xlim=x.range,lty=2,
+         ylim=c(0,max(density.out$y)))
+    means <- c(mean(all.coef.se[,"b1",1]),
+               mean(all.coef.se[,"b1",2]))
+    #abline(v=mean(all.coef[,"b1",2]),lty=2)
+    legend("topright",lty=c(1,NA,2,NA),
+           c("Under GM",
+           paste("Mean:",round(means[1],3)),
+           "Heteroskedasticity",
+           paste("Mean:",round(means[2],3))),bty="n")
+    
+
+```
+
+
+Obviously, the mean standard error underestimate the dispersion of the point estimates above.
+
+
+
+How about the robsut standard errors? Below, you will find the distributions.
+
+
+
+```{r}
+
+    x.range <- range(c(all.coef.se[,"robust",]))
+    plot(density.out <- density(all.coef.se[,"robust",1]),
+         main="",xlab=paste0("Robust standard errors"),
+         xlim=x.range)
+    #abline(v=mean(all.coef.se[,"b1",1]))
+    par(new=T)
+    plot(density(all.coef.se[,"robust",2]),ann=F,xlab="",ylab="",main="",
+         axes=F,
+         xlim=x.range,lty=2,
+         ylim=c(0,max(density.out$y)))
+    means <- c(mean(all.coef.se[,"robust",1]),
+               mean(all.coef.se[,"robust",2]))
+    #abline(v=mean(all.coef[,"b1",2]),lty=2)
+    legend("topright",lty=c(1,NA,2,NA),
+           c("Under GM",
+           paste("Mean:",round(means[1],3)),
+           "Heteroskedasticity",
+           paste("Mean:",round(means[2],3))),bty="n")
+    
+
+```
+
+Here, the mean of both standard errors is close to the dispersion of the point estimates above.
+
+
+We can compare both types of standard errors:
+
+
+```{r}
+
+par(mfrow=c(1,2))
+
+for (i.fig in 1:2){
+
+plot(all.coef.se[,"b1",i.fig],all.coef.se[,"robust",i.fig],
+     ylab="Robust SE",xlab="Naive SE",
+     main=c("GM","Heteroskedasticity")[i.fig])
+abline(coef=c(0,1),lty=2)
+  
+}
+
+
+
+```
+
+
+
+```{r}
+knitr::knit_exit()
+```
+
+
+
+
+## Multiple regression model
+
+
+
+
+## Linear probability model
+
+```{r}
+n.iv <- 1
+true.slope <- 0.4
+true.intercept <- 0.4
+
+x.mu <- 0.6
+x.Sigma <- as.matrix(0.5)
+
+true.err.var <- 0.05
+
+```
+
+
+
+
+We generate `r num.datasets` datasets with n=`r sample.size` under the GM-assumptions. The number of independent variables is `r n.iv`. The true regression line has the intercept of `r true.intercept` and the slope of `r true.slope`. The independent variables are generated with the mean `r x.mu`, variances  `r diag(x.Sigma)`.
+
+In previous examples, we generated the dependent variable by adding random errors to the predicted values generated above. Here, instead, we use the predicted values as probability that the dependent variable has the value 1. With the opposite probability, the dependent variable has the value 0. This is called Bernoulli trial.
+
+
+```{r}
+
+samples.1 <- data.generation(sample.size=sample.size,
+                             n.sim=num.datasets,
+                             n.iv=n.iv,
+                             x.mu=x.mu,
+                             x.Sigma=x.Sigma,
+                             para=c(true.intercept,true.slope),
+                             err.dist = "normal",
+                             err.disp = true.err.var,
+                             binary.y = TRUE)
+
+
+```
+
+
+
+```{r}
+
+this.data <- samples.1$generated.data[[1]]
+
+error <- this.data$y - this.data$y.hat.raw
+
+
+
+cond.mean.plot(this.data$X1, error ,num.means = 20,
+               ylab="Error",xlab="X1")
+
+
+cond.mean.plot(this.data$X1, error ,num.means = 20,
+               ylab="Error",xlab="X1",cond.var = TRUE)
+
+
+
+```
+
+
+
+
+
+
+## Weighted least squares
+
+
+```{r}
+
+```
+
+
+
+
+
+
+Analogously, we generate further two sets of samples. The second set is generated under the same parameters except that the mean value of X is set to `r x.mu+4` instead of `r x.mu`. The third set is generated under the same parameters of the first set except that the true slope is `r true.slope+0.4` instead of `r true.slope`. 
+
+
+```{r}
+
+samples.2 <- data.generation(sample.size=sample.size,
+                             n.sim=num.datasets,
+                             n.iv=n.iv,
+                             x.mu=x.mu+4,
+                             x.Sigma=x.Sigma,
+                             para=c(true.intercept,true.slope),
+                             err.dist = "normal",
+                             err.disp = true.err.var,
+                             binary.y = TRUE)
+
+samples.3 <- data.generation(sample.size=sample.size,
+                             n.sim=num.datasets,
+                             n.iv=n.iv,
+                             x.mu=x.mu,
+                             x.Sigma=x.Sigma,
+                             para=c(true.intercept,true.slope+0.4),
+                             err.dist = "normal",
+                             err.disp = true.err.var,
+                             binary.y = TRUE)
+
+```
+
+
+We can estimate the regression model $$\hat y = \tilde \beta_0 + \tilde \beta_1 x_1$$.
+
+
+```{r}
+
+all.coef <- array(NA,dim=c(num.datasets,3,3))
+all.coef.se <- array(NA,dim=c(num.datasets,2,3))
+all.predict.outside <- array(NA,dim=c(num.datasets,3,2))
+
+for (i.set in 1:3 ){
+  if (i.set ==1 ) this.generated.data <- samples.1
+  if (i.set ==2 ) this.generated.data <- samples.2
+  if (i.set ==3 ) this.generated.data <- samples.3
+for (i in 1:num.datasets){
+    this.data <- this.generated.data$generated.data[[i]]
+
+    lm.out <- lm(y ~ X1  ,data=  this.data)
+
+    all.coef[i,1:2,i.set] <- coef(lm.out)
+    all.coef[i,3,i.set] <- summary(lm.out)$sigma
+    all.coef.se[i,c(1:2),i.set] <- coef(summary(lm.out))[,2]
+
+    all.predict.outside[i,i.set,1] <- sum(this.data$y.hat==0|this.data$y.hat==1)
+    all.predict.outside[i,i.set,2] <- sum(lm.out$fitted.values<0|lm.out$fitted.values>1)
+
+    # visual presentation
+    if (i ==1){
+      plot(this.data$y ~ this.data$X1,
+           xlab="X1",ylab="Y",main="")
+      abline(coef= this.generated.data$para)
+      
+      abline(reg=lm.out,lty=2)
+      legend("bottomright",lty=c(1,2),
+             c("True","Estimated"),
+             bty="n")
+    }
+    
+}
+}  
+dimnames(all.coef)[[2]] <- c("b0","b1","sigma")
+dimnames(all.coef.se)[[2]] <- c("b0","b1")
+
+```
+
+
+Below you will find the distribution of estimated regression coefficients:
+
+
+```{r}
+
+    x.range <- range(c(all.coef[,"b1",]))
+    x.range[2] <- 0.52
+    density.out <- density(all.coef[,"b1",1])
+    plot(density.out,
+         main="",xlab=paste0("Regression coefficients for X1"),
+         xlim=x.range,ylim=c(0,max(density.out$y)*1.5))
+    abline(v=mean(all.coef[,"b1",1]))
+    par(new=T)
+    plot(density(all.coef[,"b1",2]),ann=F,xlab="",ylab="",main="",
+         axes=F,
+         xlim=x.range,lty=2,
+         ylim=c(0,max(density.out$y)*1.5))
+    abline(v=mean(all.coef[,"b1",2]),lty=2)
+    par(new=T)
+    plot(density(all.coef[,"b1",3]),ann=F,xlab="",ylab="",main="",
+         axes=F,
+         xlim=x.range,lty=2,
+         ylim=c(0,max(density.out$y)*1.5))
+    abline(v=mean(all.coef[,"b1",3]),lty=3)
+    legend("topright",lty=c(1:3),c("1st set","2nd set","3rd set"),bty="n")
+
+```
+
+For the first and second set, the true regression slope is `r true.slope` while it is set to `r true.slope+0.4` for the third set. Obviously, the estimates based on the second and third set of samples are downwards biased, while those based on the first set are almost bias free.   
+
+These results seem to have to do with how often the predicted values are outside of the range [0,1]. 
+
+
+```{r}
+
+par(mfcol=c(2,3))
+
+for (i.fig in 1:3){
+  hist(all.predict.outside[,i.fig,1]/sample.size,br=seq(-0.025,1.025,by=0.05),
+       xlab="% of outside of [0,1]",
+       main=paste(c("1st","2nd","3rd")[i.fig],"set (true)"))
+
+  hist(all.predict.outside[,i.fig,2]/sample.size,br=seq(-0.025,1.025,by=0.05),
+       xlab="% of outside of [0,1]",
+       main=paste(c("1st","2nd","3rd")[i.fig],"set (estimated)"))
+
+  }
+
+
+
+
+
+
+```
+
+The above figure shows in the upper panels how often the predicted values are outside of [0,1] in the data generation process. The lower panels presents, in contrast, how often the predicted values based on the estimated regression model are outside of the range.
+
+
+These figures are however not crucial for the above bias and estimation error. More important is the difference of the share of predicted values outside of the range between the true model and estimated results. These differences are plotted against the estimation error (estimated slope minus the true slope) in the figure below.
+
+
+
+```{r}
+
+par(mfrow=c(1,3))
+for (i.fig in 1:3){
+  if (i.fig <= 2){
+      this.error <- all.coef[,2,i.fig] - true.slope
+  } else {
+      this.error <- all.coef[,2,i.fig] - true.slope-0.4
+  }
+
+  this.share <- (all.predict.outside[,i.fig,2]-all.predict.outside[,i.fig,1])/sample.size
+  
+  plot(this.share,this.error,
+       xlab="%pt diff of outside of [0,1]",
+       ylab="Estimation error",
+       main=paste(c("1st","2nd","3rd")[i.fig],"set"))
+  abline(lm(this.error ~ this.share))
+}
+
+
+
+```
+
+The first two panels demonstrate that zero difference in the share of predicted values outside of the range is associated with the unbiased results. 
+
+
+
+
