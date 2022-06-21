@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # loading some functions
 source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/ci_sample_mean.R")
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/robust_se_srm.R")
 
 ```
 
@@ -95,6 +96,10 @@ old.gen <- old.gen[,5] + old.gen[,6]
 young.gen <- sociodem[,grep("Alter",names(sociodem))]
 young.gen <- young.gen[,2] 
 
+abi <- sociodem[,grep("allgemeiner.und.Fachhochschulreife",names(sociodem))]
+
+  
+  
 unemployment <- sociodem[,grep("Arbeitslosenquote",names(sociodem))]
 unemp.total <- unemployment[,grep("insgesamt",names(unemployment))]
 unemp.young <- unemployment[,grep("15.bis.24.Jahre",names(unemployment))]
@@ -978,6 +983,330 @@ The main effect of the unemployment rate corresponds to the partial effect of th
 ```{r}
 coefficients(interaction.2.out)[2] +                  
                         coefficients(interaction.2.out)[4]*mean(gdp.tsd)
+```
+
+
+
+## Heteroskedasticity
+
+Let's turn to the very first model which we estimated:
+
+```{r, echo = TRUE}
+
+
+plot(gdp,turnout,xlab="GDP per capita",ylab="Turnout (%)")
+
+
+```
+
+
+Simple regression models (Turnout on GDP)
+
+```{r, echo = TRUE}
+lm.out.1 <- lm(turnout ~ gdp)
+summary(lm.out.1)
+```
+
+Graphical presentation
+
+```{r, echo = TRUE}
+par(mfrow=c(1,2))
+plot(gdp,turnout,xlab="GDP per capita",ylab="Turnout (%)")
+abline(lm.out.1)
+```
+
+### Heteroskedasticity-Robust Inference after OLS Estimation
+
+We first calculate the variance of the slope under the homoskedasticity assumption according to Eqn 8.2 but with $\sigma^2$ instead of $\sigma^2_i$.
+
+For the first model (Turnout ~ GDP), we first obtain the variance of the slope and its square rood (the standard error):
+
+
+```{r}
+var.slope.1 <- sum((gdp - mean(gdp))^2*(summary(lm.out.1)$sigma^2))/((sum((gdp - mean(gdp))^2))^2)
+
+var.slope.1
+sqrt(var.slope.1)
+```
+
+The calculated standard error corresponds to that in the output before.
+
+Now, we consider the different residual size of the individual observations. That is, we consider $\hat{u}_i^2$ as in Equation 8.3:
+
+```{r}
+var.slope.1.het <- sum((gdp - mean(gdp))^2*(lm.out.1$residuals^2))/((sum((gdp - mean(gdp))^2))^2)
+
+var.slope.1.het
+sqrt(var.slope.1.het)
+```
+
+This **heteroskedasticity-robust** standard error is larger than the previous naive one. If one checks the previous graphic of the joint distribution with the regression line, we can observe a larger variance of residuals in the districts with lower GDP than in those with higher GDP. This heteroskedasticity lead to the higher robust standard error.
+
+
+
+### Testing for Heteroskedasticity
+
+Our null-hypothesis is that the homoskedasticity is true: $H_0: Var(u|x_1,...,x_k)=\sigma^2$, which is equvalent to:
+
+$H_0: E(u^2|x_1,...,x_k)=\sigma^2$.
+
+This can be tested by regressing the squared residuals on the same independent variables of the regression model of interest:
+
+```{r}
+resid.sq <- (lm.out.1$residuals)^2
+
+resid.lm.out <- lm(resid.sq ~ gdp )
+summary(resid.lm.out)
+```
+
+In the output, we can just check the overall significance of regression. In this case, F=`r round(summary(resid.lm.out)$fstatistic[1],3)` is not in the rejection region (for p=0.05). Therefore, we cannot reject the null-hypothesis.
+
+
+Above, we tested the original homoskedastiticy assumption that $E(u|x)=0$. We can instead the weaker version of the assumption $Cov(x,u)=0$ (see Chapter 5). To do this, we can apply the White test, which regresses the squared residuals on the predicted values and the squared predicted values:
+
+```{r}
+predict <- lm.out.1$fitted.values
+predict.sq <- lm.out.1$fitted.values^2
+
+white.lm.out <- lm(resid.sq ~ predict + predict.sq)
+summary(white.lm.out)
+```
+
+Also here, we cannot reject the null hypothesis.
+
+Below we repeat the same exercise for a multiple regression : turnout ~ gdp + young unemployment:
+
+
+```{r}
+lm.out.3 <- lm(turnout ~ gdp + unemp.young )
+summary(lm.out.3)
+```
+
+First, we regress the suqared residuals on all independent variables:
+
+```{r}
+resid.sq <- (lm.out.3$residuals)^2
+
+resid.lm.out <- lm(resid.sq ~ gdp + unemp.young)
+summary(resid.lm.out)
+```
+
+In this case, we reject the null hypothesis for 5% significance level.
+
+The White test gives the following result:
+
+```{r}
+predict <- lm.out.3$fitted.values
+predict.sq <- lm.out.3$fitted.values^2
+
+white.lm.out <- lm(resid.sq ~ predict + predict.sq)
+summary(white.lm.out)
+```
+
+Here, we can also reject the null-hypothesis. Note that we are testing two slightly different null-hypothesis. The first test with the original homoskedasticity assumption and the other the weaker version of that.
+
+
+### Weighted Least Squares Estimation
+
+In the above, analysis, we saw the squared residuals are positively correlated with the share of youth unemployment (the variable $unemp.young$). Now we assume that the residual variance is proportional to this variable: $Var(u_i|unemp.young_i)=\sigma^2 unemp.young_i$. 
+
+Under this assumption, we divide all the variables by the square root of the "unemp.young" variable and estimate the coefficients:
+
+```{r}
+turnout.star <- turnout/sqrt(unemp.young)
+interc.star <- 1/sqrt(unemp.young)
+gdp.star <- gdp/sqrt(unemp.young)
+unemp.young.star <- unemp.young/sqrt(unemp.young)
+
+
+
+wls.out <- lm(turnout.star ~ 0 + interc.star + gdp.star + unemp.young.star )
+summary(wls.out)
+
+```
+
+This is the result of the Weighted Least Squares (WLS) estimation. To compare, we will check the OLS results again.
+
+```{r}
+summary(lm.out.3)
+```
+
+## 8.4 Feasible Generalized Least Squares esimation
+
+
+WLS required a certain heteroskedasticity function ($Var(u_i|unemp.young_i)=\sigma^2 unemp.young_i$ in the above example).
+
+In many cases, the exact form of the heteroskedasticity is not known. In such case, we can estimate the heteroskedasticity function.
+
+We assume the following function:
+
+$Var(u|x) = \sigma^2 \exp(\delta_0 + \delta_1 x_1 + ... + \delta_k x_k)$
+
+with $\delta_0 ... \delta_k$ being unknown parameters.
+
+The above equation can be reformulated as follows:
+
+$Var(u|x) = E(u^2|x) = \sigma^2 \exp(\delta_0 + \delta_1 x_1 + ... + \delta_k x_k)$
+
+By assuming $\nu$ a random variable with unit mean:
+
+$u^2 = \sigma^2 \exp(\delta_0 + \delta_1 x_1 + ... + \delta_k x_k)\nu$.
+
+Taking the log of both sides of the equation:
+
+$\ln(u^2) = \ln(\sigma^2) + \delta_0 + \delta_1 x_1 + ... + \delta_k x_k + e$.
+
+The parameter of this model can be obtained by regressing the log of the squared residuals on the independent variables:
+
+```{r}
+resid.sq.log <- log((lm.out.3$residuals^2))
+
+heterosk.func <- lm(resid.sq.log ~ gdp + unemp.young)
+summary(heterosk.func)
+
+```
+
+Here, the estimated parameters are not important, but the predicted values since we are interested in the weights of individual observations. They can be obtained by exponentiating the predicted values:
+
+```{r}
+weights <- exp(heterosk.func$fitted.values)
+```
+
+Now we can conduct WLS by using the obtained weights:
+
+```{r}
+turnout.star <- turnout/sqrt(weights)
+interc.star <- 1/sqrt(weights)
+gdp.star <- gdp/sqrt(weights)
+unemp.young.star <- unemp.young/sqrt(weights)
+
+
+fgls.out <- lm(turnout.star ~ 0 + interc.star + gdp.star + unemp.young.star )
+summary(fgls.out)
+```
+
+To check, we can compare the results with those based on WLS and OLS.
+
+```{r}
+summary(lm.out.3)
+summary(wls.out)
+```
+
+Another possible comparison can be done based on the weights. 
+
+```{r}
+
+par(mfrow=c(1,2))
+plot(weights ~ gdp)
+
+plot(weights ~ unemp.young)
+```
+
+The weights used in FGLS is strongly correlated with the GDP variable, which was used for the WLS estimation. 
+
+## 8.5 The Linear Probability Model Revisited
+
+The linear probability model must contain heteroskedasticity (except $\beta_j=0$ for all j):
+
+$Var(y|x)=p(x)[1-p(x)]$ with $p(x)=\beta_0 + \beta_1 x_1 +...+\beta_k x_k$.
+
+```{r}
+var.function <- function(p) p*(1-p)
+curve(var.function,0,1,xlab="p(x)",ylab="Var(y)")
+
+```
+
+
+
+Two possible remedies: 
+
+- OLS-estimates + robust standard errors.
+- WLS-estimates with the weights $\hat{h} = \hat{y}(1-\hat{y})$.
+
+For example, we regress whether AfD exceeded 10% valid votes on GDP:
+
+```{r}
+afd.10 <- ifelse(afd.pr>10,1,0)
+
+lpm.out <- lm(afd.10 ~ gdp.tsd)
+summary(lpm.out)
+
+plot(afd.10 ~ gdp.tsd,xlab="GDP (TSD)",ylab="AfD exceeds 10%")
+abline(lpm.out)
+
+```
+
+The (heteroskedasticits-) robust standard error is:
+
+```{r}
+var.slope.lpm.het <- sum((gdp.tsd - mean(gdp.tsd))^2*(lpm.out$residuals^2))/((sum((gdp.tsd - mean(gdp.tsd))^2))^2)
+
+var.slope.lpm.het
+sqrt(var.slope.lpm.het)
+```
+
+The WLS estimates are:
+
+```{r, error=TRUE}
+predicted <- lpm.out$fitted.values
+h.hat <- predicted * (1-predicted)
+
+wls.lpm.out <- lm(afd.10 ~ gdp.tsd,weights = 1/h.hat)
+summary(wls.lpm.out)
+```
+
+
+
+This does not work since some predicted values are not in the range $(0,1)$. 
+
+
+```{r}
+predicted <- lpm.out$fitted.values
+hist(predicted)
+```
+
+
+The figure shows that some predictions are under zero. This makes $\hat{h}$ negative values, which cannot be used as weight.
+
+
+One possibility is to adjust those predicted values. We can replace the predicted values below zero with 0.01:
+
+
+
+```{r}
+predicted <- lpm.out$fitted.values
+predicted[predicted<=0] <- 0.01
+
+h.hat <- predicted * (1-predicted)
+
+wls.lpm.out <- lm(afd.10 ~ gdp.tsd,
+                  weights = 1/h.hat)
+summary(wls.lpm.out)
+```
+
+The replaced value 0.01 was arbitrarily chosen. We can also use 0.001:
+
+
+```{r}
+predicted <- lpm.out$fitted.values
+predicted[predicted<=0] <- 0.001
+
+h.hat <- predicted * (1-predicted)
+
+wls.lpm.out <- lm(afd.10 ~ gdp.tsd,
+                  weights = 1/h.hat)
+summary(wls.lpm.out)
+```
+
+Here, the result is different since we have a significant amount of predicted values outside of $(0,1)$. In such cases, we should better use the heteroskedasticity-robust statistics.
+
+
+
+```{r}
+summary(lpm.out)
+
+robust.se.srm(lpm.out)
+
 ```
 
 
