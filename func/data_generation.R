@@ -20,7 +20,8 @@
 #'        one/zero.
 #' @param het logical. If TRUE, the errors have heteroskedasticity. 
 #'         Its functional form depending on X is specified by using 'het.delta'.
-#' @param het.delta Function of the heteroskedasticity: delta_0 + delta_1 X1 +... delta_J X_j
+#' @param het.delta A parameter vector for the function of the heteroskedasticity: 
+#'          u^2 = \sigma^2 exp(delta_0 + delta_1 X1 +... delta_J X_j)
 #' @return A list including all parameter values and generated datasets. 
 #'         The generated datasets are saved in the list named 'generated.data'.
 # ---------------------------------------------------------------------------- #
