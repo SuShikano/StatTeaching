@@ -65,7 +65,8 @@ data.generation <- function(sample.size=100,
     }else {
       # In case of heteroskedasticity
       if (het) {
-        err.disp.used <- err.disp * c(exp(cbind(1,X) %*% het.delta ) )
+        het.weight <- c(exp(cbind(1,X) %*% het.delta ) )
+        err.disp.used <- err.disp * het.weight
         err.disp.used[err.disp.used == Inf] <- max(err.disp.used[is.finite(err.disp.used)]) 
       }else{
         err.disp.used <- err.disp
@@ -80,10 +81,13 @@ data.generation <- function(sample.size=100,
       this.dat <- as.data.frame(cbind(y,X,y.hat,y.hat.raw))
     }else{
       this.dat <- as.data.frame(cbind(y,X,error))
+      if (het) this.dat <- cbind(this.dat,het.weight)
     }
 
     generated.data[[i.sim]]  <- this.dat
   }
+  
+  
   
   out.list <- list(sample.size=sample.size,
                    n.sim=n.sim,
