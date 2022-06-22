@@ -1,5 +1,5 @@
 # ##############################################################################
-#' Generating multiple datasets under different assumptions and set-ups
+#' Computing the robust standard error based on a simple regression model
 #'
 #' @param srm.out output of lm() with a simple regression model
 #' @return robust standard error
