@@ -994,7 +994,7 @@ Let's turn to the very first model which we estimated:
 ```{r, echo = TRUE}
 
 
-plot(gdp,turnout,xlab="GDP per capita",ylab="Turnout (%)")
+plot(gdp.tsd,turnout,xlab="GDP per capita (in TSD Euro)",ylab="Turnout (%)")
 
 
 ```
@@ -1003,15 +1003,15 @@ plot(gdp,turnout,xlab="GDP per capita",ylab="Turnout (%)")
 Simple regression models (Turnout on GDP)
 
 ```{r, echo = TRUE}
-lm.out.1 <- lm(turnout ~ gdp)
+lm.out.1 <- lm(turnout ~ gdp.tsd)
 summary(lm.out.1)
 ```
 
 Graphical presentation
 
 ```{r, echo = TRUE}
-par(mfrow=c(1,2))
-plot(gdp,turnout,xlab="GDP per capita",ylab="Turnout (%)")
+
+plot(gdp.tsd,turnout,xlab="GDP per capita",ylab="Turnout (%)")
 abline(lm.out.1)
 ```
 
@@ -1023,7 +1023,7 @@ For the first model (Turnout ~ GDP), we first obtain the variance of the slope a
 
 
 ```{r}
-var.slope.1 <- sum((gdp - mean(gdp))^2*(summary(lm.out.1)$sigma^2))/((sum((gdp - mean(gdp))^2))^2)
+var.slope.1 <- sum((gdp.tsd - mean(gdp.tsd))^2*(summary(lm.out.1)$sigma^2))/((sum((gdp.tsd - mean(gdp.tsd))^2))^2)
 
 var.slope.1
 sqrt(var.slope.1)
@@ -1034,7 +1034,7 @@ The calculated standard error corresponds to that in the output before.
 Now, we consider the different residual size of the individual observations. That is, we consider $\hat{u}_i^2$ as in Equation 8.3:
 
 ```{r}
-var.slope.1.het <- sum((gdp - mean(gdp))^2*(lm.out.1$residuals^2))/((sum((gdp - mean(gdp))^2))^2)
+var.slope.1.het <- sum((gdp.tsd - mean(gdp.tsd))^2*(lm.out.1$residuals^2))/((sum((gdp.tsd - mean(gdp.tsd))^2))^2)
 
 var.slope.1.het
 sqrt(var.slope.1.het)
@@ -1055,7 +1055,7 @@ This can be tested by regressing the squared residuals on the same independent v
 ```{r}
 resid.sq <- (lm.out.1$residuals)^2
 
-resid.lm.out <- lm(resid.sq ~ gdp )
+resid.lm.out <- lm(resid.sq ~ gdp.tsd )
 summary(resid.lm.out)
 ```
 
@@ -1078,7 +1078,7 @@ Below we repeat the same exercise for a multiple regression : turnout ~ gdp + yo
 
 
 ```{r}
-lm.out.3 <- lm(turnout ~ gdp + unemp.young )
+lm.out.3 <- lm(turnout ~ gdp.tsd + unemp.young )
 summary(lm.out.3)
 ```
 
@@ -1087,7 +1087,7 @@ First, we regress the suqared residuals on all independent variables:
 ```{r}
 resid.sq <- (lm.out.3$residuals)^2
 
-resid.lm.out <- lm(resid.sq ~ gdp + unemp.young)
+resid.lm.out <- lm(resid.sq ~ gdp.tsd + unemp.young)
 summary(resid.lm.out)
 ```
 
@@ -1115,7 +1115,7 @@ Under this assumption, we divide all the variables by the square root of the "un
 ```{r}
 turnout.star <- turnout/sqrt(unemp.young)
 interc.star <- 1/sqrt(unemp.young)
-gdp.star <- gdp/sqrt(unemp.young)
+gdp.star <- gdp.tsd/sqrt(unemp.young)
 unemp.young.star <- unemp.young/sqrt(unemp.young)
 
 
@@ -1161,7 +1161,7 @@ The parameter of this model can be obtained by regressing the log of the squared
 ```{r}
 resid.sq.log <- log((lm.out.3$residuals^2))
 
-heterosk.func <- lm(resid.sq.log ~ gdp + unemp.young)
+heterosk.func <- lm(resid.sq.log ~ gdp.tsd + unemp.young)
 summary(heterosk.func)
 
 ```
@@ -1177,7 +1177,7 @@ Now we can conduct WLS by using the obtained weights:
 ```{r}
 turnout.star <- turnout/sqrt(weights)
 interc.star <- 1/sqrt(weights)
-gdp.star <- gdp/sqrt(weights)
+gdp.star <- gdp.tsd/sqrt(weights)
 unemp.young.star <- unemp.young/sqrt(weights)
 
 
@@ -1197,12 +1197,12 @@ Another possible comparison can be done based on the weights.
 ```{r}
 
 par(mfrow=c(1,2))
-plot(weights ~ gdp)
+plot(weights ~ gdp.tsd)
 
 plot(weights ~ unemp.young)
 ```
 
-The weights used in FGLS is strongly correlated with the GDP variable, which was used for the WLS estimation. 
+The weights used in FGLS is strongly correlated with the GDP variable, which was not used for the WLS estimation. 
 
 ## 8.5 The Linear Probability Model Revisited
 
