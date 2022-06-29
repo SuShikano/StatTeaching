@@ -1112,6 +1112,333 @@ We can not reject here the null-hypothesis.
 
 
 
+## Pooled Cross Sections 
+
+
+We estimate the following model with the quadratic function:
+
+```{r}
+summary(lm.out.dummy <- lm(skalo.true ~ lr.dist.abs + lr.dist.sqr + as.factor(party)
+                           ,data=long.data))
+```
+
+
+```{r}
+
+plot(long.data$skalo.true ~ long.data$lr.dist.abs,
+     xlab="Close <- -> Distant",ylab="Dislike <-  -> Like",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+
+predicted.cdu <- coef(lm.out.dummy)[1] + coef(lm.out.dummy)[2]*c(0:10)+ coef(lm.out.dummy)[3]* (c(0:10))^2
+predicted.csu <- coef(lm.out.dummy)[1] + coef(lm.out.dummy)[2]*c(0:10) +coef(lm.out.dummy)[3]* (c(0:10))^2 +coef(lm.out.dummy)[4]
+predicted.spd <- coef(lm.out.dummy)[1] + coef(lm.out.dummy)[2]*c(0:10) +coef(lm.out.dummy)[3]* (c(0:10))^2 +coef(lm.out.dummy)[5]
+predicted.gru <- coef(lm.out.dummy)[1] + coef(lm.out.dummy)[2]*c(0:10) +coef(lm.out.dummy)[3]* (c(0:10))^2 +coef(lm.out.dummy)[6]
+predicted.fdp <- coef(lm.out.dummy)[1] + coef(lm.out.dummy)[2]*c(0:10) +coef(lm.out.dummy)[3]* (c(0:10))^2 +coef(lm.out.dummy)[7]
+predicted.afd <- coef(lm.out.dummy)[1] + coef(lm.out.dummy)[2]*c(0:10) +coef(lm.out.dummy)[3]* (c(0:10))^2 +coef(lm.out.dummy)[8]
+predicted.lin <- coef(lm.out.dummy)[1] + coef(lm.out.dummy)[2]*c(0:10) +coef(lm.out.dummy)[3]* (c(0:10))^2 +coef(lm.out.dummy)[9]
+
+par(new=T)
+plot(predicted.cdu ~ c(0:10),col="orange",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.csu ~ c(0:10),col="cyan",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.spd ~ c(0:10),col="red",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.gru ~ c(0:10),col="green",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.fdp ~ c(0:10),col="yellow",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.afd ~ c(0:10),col="blue4",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.lin ~ c(0:10),col="pink",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+
+
+legend("topright",col=c("orange","cyan","red","green","yellow","blue4","pink"),
+       lty=c(rep(1,8)),c("CDU","CSU","SPD","Greens","FDP","AfD",
+                        "Linke"),
+       lwd=c(rep(1,8)),
+       bty="n")
+
+```
+
+
+Let's look at the data again:
+
+```{r}
+
+head(long.data[,1:7],n=20)
+
+```
+
+There is a variable "wave" which codes the time point of data collection:
+
+```{r}
+table(long.data$wave)
+```
+
+According to the frequency table, the data were collected at three different time points. That is, we pooled three cross sections. 
+
+
+
+We might be interested whether the relationship between party evaluation and ideological distance is different at the three time points. One possibility is to estimate different regression models for each time point and compare them with the overall regression (the Chow test). Here, we add the interaction effects with the dummy variable for the panel waves. This is equivalent to estimate three separate regression models:
+
+
+
+```{r}
+summary(lm.out.chow <- lm(skalo.true ~ lr.dist.abs* as.factor(wave) + 
+                             lr.dist.sqr* as.factor(wave) + 
+                             as.factor(party)* as.factor(wave) ,data=long.data))
+```
+
+The result shows that multiple interaction effects with the 3rd wave is significant. That is, we find significant differences in the regression lines between the first/second waves and the third wave. Further, R-square is  larger than that of the model without dummy (`r round(summary(lm.out.dummy)$r.squared,4)'). It is also possible to calculate the exact F-statistics based on the R-square, which is large enough to reject the null hypothesis of no structural change across time.
+
+
+
+
+
+
+## Panel data and fixed effect models
+
+In the above analysis, we just treated both panel waves as independent (*independently pooled cross sections*). If one looks at the data more closely, this is not the case:
+
+```{r}
+head(long.data[24:100,1:7],n=20)
+```
+
+The first three digits of $id$ is the subject number and this indicates that the first 14 rows are of the same respondent. For each panel wave, we have 7 evaluations of the same individual. Therefore, we have here a panel dataset.
+
+It is reasonable to assume that individual respondents use the scale for party evaluation differently. That is, some tend to evaluate parties more positively in general than others. To capture such an unobserved heterogeneity between individual subjects, we include the dummy variable for all respondents:
+
+```{r}
+
+long.data$subject <- round(long.data$id/100)
+
+summary(lm.out.dummy.fe <- lm(skalo.true ~ lr.dist.abs +lr.dist.sqr + as.factor(party) + as.factor(wave) + as.factor(subject) ,data=long.data))
+
+```
+
+
+Since we have `r  length(unique(long.data$subject))' respondents, there are so many dummy variables and their coefficients. To get intuition, we can check two respondents (subject.id==120 and 162) in the graphical presentation:
+
+
+```{r}
+
+par(mfrow=c(1,2))
+for (i.subj in c(120,162)){
+  
+  this.fe <-coef(lm.out.dummy.fe)[grep(as.character(i.subj),
+                                       names(coef(lm.out.dummy.fe)))]
+  
+  plot(long.data$skalo.true ~ long.data$lr.dist.abs,
+     xlab="Close <- -> Distant",ylab="Dislike <-  -> Like",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T),col="grey",
+     main=paste("Subject ID:",i.subj))
+  par(new=T)  
+  plot(long.data$skalo.true[long.data$subject==i.subj] ~
+         long.data$lr.dist.abs[long.data$subject==i.subj],
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T),
+     col="red",pch=19)
+
+predicted.cdu <- coef(lm.out.dummy)[1] + coef(lm.out.dummy)[2]*c(0:10)+ coef(lm.out.dummy)[3]* (c(0:10))^2 + this.fe
+predicted.csu <- coef(lm.out.dummy)[1] + coef(lm.out.dummy)[2]*c(0:10) +coef(lm.out.dummy)[3]* (c(0:10))^2 +coef(lm.out.dummy)[4] + this.fe
+predicted.spd <- coef(lm.out.dummy)[1] + coef(lm.out.dummy)[2]*c(0:10) +coef(lm.out.dummy)[3]* (c(0:10))^2 +coef(lm.out.dummy)[5] + this.fe
+predicted.gru <- coef(lm.out.dummy)[1] + coef(lm.out.dummy)[2]*c(0:10) +coef(lm.out.dummy)[3]* (c(0:10))^2 +coef(lm.out.dummy)[6] + this.fe
+predicted.fdp <- coef(lm.out.dummy)[1] + coef(lm.out.dummy)[2]*c(0:10) +coef(lm.out.dummy)[3]* (c(0:10))^2 +coef(lm.out.dummy)[7] + this.fe
+predicted.afd <- coef(lm.out.dummy)[1] + coef(lm.out.dummy)[2]*c(0:10) +coef(lm.out.dummy)[3]* (c(0:10))^2 +coef(lm.out.dummy)[8] + this.fe
+predicted.lin <- coef(lm.out.dummy)[1] + coef(lm.out.dummy)[2]*c(0:10) +coef(lm.out.dummy)[3]* (c(0:10))^2 +coef(lm.out.dummy)[9] + this.fe
+
+par(new=T)
+plot(predicted.cdu ~ c(0:10),col="orange",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.csu ~ c(0:10),col="cyan",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.spd ~ c(0:10),col="red",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.gru ~ c(0:10),col="green",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.fdp ~ c(0:10),col="yellow",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.afd ~ c(0:10),col="blue4",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.lin ~ c(0:10),col="pink",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+
+
+legend("topright",col=c("orange","cyan","red","green","yellow","blue4","pink"),
+       lty=c(rep(1,8)),c("CDU","CSU","SPD","Greens","FDP","AfD",
+                        "Linke"),
+       lwd=c(rep(1,8)),
+       bty="n")
+}
+
+
+
+```
+
+It is obvious that both respondents use the scale for like/dislike differently. Respondent 120 tend to evaluate parties more positively in general than Repondent 162.  
+
+
+One can also check the correlation between ideological distances as independent variable and the estimated fixed effects:
+
+
+```{r}
+fixed.effects <- coef(lm.out.dummy.fe)[grep("subject",
+                                       names(coef(lm.out.dummy.fe)))]
+fixed.effects <- c(coef(lm.out.dummy.fe)[1],fixed.effects)
+names(fixed.effects) <- unique(long.data$subject)
+
+o <- match(long.data$subject,names(fixed.effects))
+
+long.data$fixed.effects <- fixed.effects[o]
+
+
+plot(long.data$fixed.effects ~ long.data$lr.dist.abs,
+     ylab="Fixed effects",xlab="Ideological Distance (abs)")
+
+cor.test(long.data$fixed.effects ,long.data$lr.dist.abs)
+cor.test(long.data$fixed.effects ,long.data$lr.dist.sqr)
+
+
+```
+
+The estimated positive correlation is also significant at 5% level. Therefore, the model without the fixed effect is likely to violate the important assumption of the linear regression model.
+
+
+### First differenced estimator
+
+Another possibility to cope with the individual heterogeneity is to take the first-differences.
+
+In our dataset, each of the respondent-party pairs may have two observations. For example, the first and eighth rows are Respondent 105's evaluation of CDU (party=1) at two different panel waves. 
+
+
+```{r}
+head(long.data[24:100,1:7],n=20)
+```
+
+
+We are now reoganizing the data which only include the adjacent respondent-party pairs and they are grouped in the next rows: 
+
+
+
+```{r}
+
+
+
+long.data$subject.party <- long.data$subject*10 + long.data$party
+
+long.data <- long.data[order(long.data$subject.party),]
+
+# keeping only adjacent data
+freq.subject.party <- table(long.data$subject.party)
+adjacent <- as.numeric(names(freq.subject.party[freq.subject.party>=2]))
+
+adjacent.data <- long.data[long.data$subject.party %in% adjacent,]
+
+head(adjacent.data[,1:7],n=20)
+
+```
+
+
+
+
+From this data, we create the first differences 
+
+
+
+
+```{r}
+# creating a wide format data
+unique.subject.party <- unique(long.data$subject.party)
+
+diff.data <- NULL
+for (i.wave in 1:2){
+  dat.t1 <- adjacent.data[adjacent.data$wave==i.wave,
+                     c("subject.party","skalo.true",
+                       "lr.dist.abs","lr.dist.sqr","party")] 
+  dat.t2 <- adjacent.data[adjacent.data$wave==i.wave+1,
+                     c("subject.party","skalo.true",
+                       "lr.dist.abs","lr.dist.sqr","party")] 
+  
+  o <- match(dat.t1$subject.party,dat.t2$subject.party)
+  
+  this.diff.data <- dat.t2[o,] - dat.t1
+  this.diff.data$subject.party <- dat.t1$subject.party
+  this.diff.data$party <- dat.t1$party
+  this.diff.data$wave <- i.wave+1
+  this.diff.data <- this.diff.data[!is.na(this.diff.data$skalo.true),]
+  
+  diff.data <- rbind(diff.data,
+                     this.diff.data
+                     )
+}
+
+
+summary(lm(skalo.true ~ lr.dist.abs +lr.dist.sqr + as.factor(party),data=diff.data))
+
+
+```
+
+Now, the coefficients of both ideological distance measures are very small and only the that of the absolute ideological distance measure is significant at 5% more. Here, however, we have to note that we sweeped out individual heterogeneity by first differencing. This strongly reduced the variance of both dependent and independent variables (see the figure below). Furthermore, our independent variables are certainly suffering from measurement errors. The first differencing makes this problem even more serious.
+
+
+```{r}
+par(mfrow=c(1,2))
+
+plot(long.data$skalo.true ~ long.data$lr.dist.abs,main="Rawdata",
+     ylab="Party evaluation",xlab="Ideological distance")
+plot(diff.data$skalo.true ~ diff.data$lr.dist.abs,main="First differences",
+     ylab="Party evaluation",xlab="Ideological distance")
+```
+
+
+
+
+
 
 ```{r}
 knitr::knit_exit()
