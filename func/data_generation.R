@@ -22,6 +22,16 @@
 #'         Its functional form depending on X is specified by using 'het.delta'.
 #' @param het.delta A parameter vector for the function of the heteroskedasticity: 
 #'          u^2 = \sigma^2 exp(delta_0 + delta_1 X1 +... delta_J X_j)
+#' @param iv logical If TRUE, instrumental variables are generated. 
+#'           This feature is currently possible only for simple regression models
+#'           which are mis-specified by omitting another independent variable.
+#' @param iv.num Number of instrumental variables
+#' @param iv.mu.cov A vector consisting of the instrumental variable's mean, 
+#'                  variance and covariance with the other independent variables.
+#'                  If e.g. two instrumental variables are to be generated,
+#'                  the vector has the element in the following order:
+#'                  mean_z1, mean_z2, var_z1, var_z2, 
+#'                  cov_x1_z1, cov_x1_z2,...,cov_xj_z1, cov_xj_z2, cov_z1_z2.
 #' @return A list including all parameter values and generated datasets. 
 #'         The generated datasets are saved in the list named 'generated.data'.
 # ---------------------------------------------------------------------------- #
@@ -37,7 +47,10 @@ data.generation <- function(sample.size=100,
                             err.disp = 25,
                             binary.y = FALSE,
                             het = FALSE,
-                            het.delta = c(0.1,0.1,0.1)
+                            het.delta = c(0.1,0.1,0.1),
+                            instv = FALSE,
+                            instv.num = NULL,
+                            instv.mu.cov = NULL
 ){
   
   if (length(x.mu)!=n.iv ) stop("Check the length of x.mu and n.iv.")
@@ -45,15 +58,72 @@ data.generation <- function(sample.size=100,
   if (nrow(x.Sigma)!=n.iv| ncol(x.Sigma)!=n.iv ) stop("Check the dimensionality of x.Sigma and the length of n.iv.")
   if (length(para) != (n.iv+1)) stop("Check the length of para and n.iv.")
   if (het) if (length(het.delta)!= (length(x.mu)+1)) stop("Check the length of het.delta, which has the length of the number of independent variables + 1.")
+  if (instv) if (is.null(instv.num)) stop("Specify instv.num")
+  if (instv) if (is.null(instv.mu.cov)) stop("Specify instv.mu.cov")
+  if (instv) {
+    if (length(instv.mu.cov)!= ((length(x.mu)+2)*instv.num + (instv.num*(instv.num-1)/2))) {
+      stop("Check the length of instv.mu.cov, which has the length of the number of independent variables + 2.")
+    }
+  }
+  if (instv & instv.num==1) {
+    if (instv.mu.cov[length(instv.mu.cov)]!=0){
+      print("Covariance with the last independent variable is not zero.")
+    }
+  } 
   
   library(MASS)
   if (!is.null(random.seed)) set.seed(random.seed)  
   generated.data <- vector(mode = "list", length = n.sim)
   
   for (i.sim in 1:n.sim){
-    X <- mvrnorm(sample.size, mu=x.mu, Sigma=x.Sigma) 
+    
+    # If iv is TRUE, we create an additional X variable as IV
+    if (instv){
+      all.vars <- instv.mu.cov[(instv.num+1):(instv.num*2)]
+      all.covs <- instv.mu.cov[(instv.num*2+1):(length(instv.mu.cov)-instv.num*(instv.num-1)/2)]
+      all.covs.z <- instv.mu.cov[((length(instv.mu.cov)-instv.num*(instv.num-1)/2)+1):length(instv.mu.cov)]
+      
+      covs.z.counter <- 1
+      for (i.iv in 1:instv.num){
+        if (i.iv==1){
+          x.Sigma.for.sim <- 
+            cbind(x.Sigma,all.covs[seq(i.iv,length(all.covs),by=instv.num)])
+          x.Sigma.for.sim <- 
+            rbind(x.Sigma.for.sim,
+                  c(all.covs[seq(i.iv,length(all.covs),by=instv.num)],all.vars[i.iv]))
+        }else{
+          x.Sigma.for.sim <- 
+            cbind(x.Sigma.for.sim,
+                  c(all.covs[seq(i.iv,length(all.covs),by=instv.num)],
+                    all.covs.z[covs.z.counter:(covs.z.counter+i.iv-2)]))
+          x.Sigma.for.sim <- 
+            rbind(x.Sigma.for.sim,
+                  c(all.covs[seq(i.iv,length(all.covs),by=instv.num)],
+                    all.covs.z[covs.z.counter:(covs.z.counter+i.iv-2)],
+                    all.vars[i.iv]))
+          covs.z.counter <- covs.z.counter+i.iv-1
+        }
+      }
+      x.mu.for.sim <- c(x.mu,instv.mu.cov[1:instv.num])
+    }else{
+      x.mu.for.sim <- x.mu
+      x.Sigma.for.sim <- x.Sigma
+    }
+    
+    # create X
+    X <- mvrnorm(sample.size, mu=x.mu.for.sim, Sigma=x.Sigma.for.sim) 
+    
+    if (instv){
+      IV <- X[,(n.iv+1):ncol(X)]      
+      X <- X[,1:n.iv]      
+      
+      if (instv.num>1){
+        colnames(IV) <- paste0("IV",1:instv.num)
+      }
+    }
+    
     colnames(X) <- paste0("X",1:n.iv)
-
+    
     y.hat <- c(cbind(1,X)%*% para)
     
     if (binary.y){
@@ -83,6 +153,8 @@ data.generation <- function(sample.size=100,
       this.dat <- as.data.frame(cbind(y,X,error))
       if (het) this.dat <- cbind(this.dat,het.weight)
     }
+    
+    if (instv) this.dat <- cbind(this.dat,IV)
 
     generated.data[[i.sim]]  <- this.dat
   }
@@ -100,6 +172,8 @@ data.generation <- function(sample.size=100,
                    err.disp = err.disp,
                    binary.y = binary.y,
                    het = het,
+                   instv = instv,
+                   instv.mu.cov = instv.mu.cov,
                    generated.data = generated.data)
 }
 
