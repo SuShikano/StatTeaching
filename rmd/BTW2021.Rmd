@@ -1613,6 +1613,219 @@ summary(iv.reg.out.3 <- ivreg( afd.pr ~ turnout |  temp.max))
 Here, we obtained a very large negative effect of turnout on the AfD vote share. Here, however, due to the first diagnostic, we seem to have a weaker instrument than the rainfall variable. For this reason, it is better to take the rainfall variable as instrument.
 
 
+
+## Logit and Probit Models for Binary Response
+
+
+
+```{r}
+# vote results in SMD tier
+
+all.smd <- result21[,grep("Erststimmen",names(result21))]
+all.smd <- all.smd[,-c(1:4)]
+
+max.party <- apply(all.smd,1,which.max)
+
+spd.win <- ifelse(max.party==2,1,0)
+union.win <- ifelse(max.party==1|max.party==7,1,0)
+gru.win <- ifelse(max.party==6,1,0)
+
+
+```
+
+
+We model the dependent variable whether CDU/CSU candidate won the district by using the variables: GDP, and abi.
+
+
+
+
+We first estimate the linear probability model:
+
+```{r}
+
+lpm.out <- lm(union.win ~ gdp + abi )
+summary(lpm.out)
+
+```
+
+Now, we estimate the logit model:
+
+```{r}
+logit.out <- glm(union.win ~ gdp + abi ,family=binomial(link="logit"))
+summary(logit.out)
+```
+
+and the probit model:
+
+```{r}
+probit.out <- glm(union.win ~ gdp + abi ,family=binomial(link="probit"))
+summary(probit.out)
+```
+
+We compare the predicted values based on three different models. Below, we predict the winning probability of the CDU/CSU candidates for different levels of GDP, while keeping the other variables (abi) being the average:
+
+```{r}
+# average values for abi 
+abi.bar <- mean(abi)
+
+# generate different values for the GDP variable between its minimum and maximum value
+gdp.values <- seq(min(gdp),max(gdp),length=100)
+
+# predict for different catholic shares based on different model
+## LPM
+predict.lpm <- coefficients(lpm.out)[1] + 
+               coefficients(lpm.out)[2] *gdp.values + 
+               coefficients(lpm.out)[3] *abi.bar 
+
+predict.logit <- coefficients(logit.out)[1] + 
+               coefficients(logit.out)[2] *gdp.values + 
+               coefficients(logit.out)[3] *abi.bar 
+predict.logit <- exp(predict.logit)/(1+exp(predict.logit))
+
+predict.probit <- coefficients(probit.out)[1] + 
+               coefficients(probit.out)[2] *gdp.values + 
+               coefficients(probit.out)[3] *abi.bar 
+predict.probit <- pnorm(predict.probit)
+
+plot(gdp.values,predict.lpm,ylim=c(0,1),type="l",
+     xlab="GDP",ylab="Winning prob of CDU/CSU")
+lines(gdp.values, predict.logit, col="red",lty=2)
+lines(gdp.values, predict.probit, col="blue",lty=2)
+
+```
+
+
+Now, we change the average value for the abi (`r min(abi)`) variable to the maximum value (`r max(abi)` in Hamburg Mitte): 
+
+```{r}
+# average values for GDP, but the maximum value for abi
+abi.max <- max(abi)
+
+
+# predict for different catholic shares based on different model
+## LPM
+predict.lpm <- coefficients(lpm.out)[1] + 
+               coefficients(lpm.out)[2] *gdp.values + 
+               coefficients(lpm.out)[3] *abi.max 
+
+predict.logit <- coefficients(logit.out)[1] + 
+               coefficients(logit.out)[2] *gdp.values + 
+               coefficients(logit.out)[3] *abi.max 
+predict.logit <- exp(predict.logit)/(1+exp(predict.logit))
+
+predict.probit <- coefficients(probit.out)[1] + 
+               coefficients(probit.out)[2] *gdp.values + 
+               coefficients(probit.out)[3] *abi.max 
+predict.probit <- pnorm(predict.probit)
+
+plot(gdp.values,predict.lpm,ylim=c(0,1),type="l",
+     xlab="GDP",ylab="Winning prob of CDU/CSU")
+lines(gdp.values, predict.logit, col="red",lty=2)
+lines(gdp.values, predict.probit, col="blue",lty=2)
+
+
+```
+
+It is apparent that the partial effect of the same level of GDP differ depending on the share of voters with University entrance diploma (Abi).
+
+
+## 17.1 Logit and Probit Models for Binary Response: LR-test
+
+We focus here only on the probit model:
+
+```{r}
+probit.out <- glm(union.win ~ gdp + abi ,family=binomial(link="probit"))
+summary(probit.out)
+```
+
+Concerning this model, we test whether all the included independent variables are relevant as a whole to explain the winning probability of CDU/CSU candidates. To do this, we can estimate the restricted model without any independent variables:
+
+```{r}
+probit.out.res <- glm(union.win ~ 1,family=binomial(link="probit"))
+summary(probit.out.res)
+```
+
+We can obtain the log likelihood of both models: 
+
+```{r}
+logLik(probit.out)
+logLik(probit.out.res)
+```
+
+... and the likelihood ration, as well:
+
+```{r}
+LR <- as.numeric(2 * (logLik(probit.out) - logLik(probit.out.res)))
+LR
+```
+
+This value follows the chi-square distribution with 2 df:
+
+```{r}
+chisq.func <- function(x) dchisq(x,df=3)
+
+curve(chisq.func,0,60,ylab="Density",xlab="Chi squared")
+abline(v=qchisq(0.95,df=3),lty=2)
+```
+
+At the significance level of 5%, we can reject the Null-hypothesis, "the restricted and unrestricted models do not differ".
+
+
+## 17.3 The Poisson Regression Model
+
+Suppose we are interested in the absolute votes which the German Communist Party recieved. 
+
+```{r}
+hist(dkp.pr.abs,br=seq(0,500,by=10))
+```
+
+We first regress it on the unemployment rate:
+
+```{r}
+lm.out <- lm(dkp.pr.abs ~ unemployment)
+summary(lm.out)
+```
+
+There is a positive effect...
+
+```{r}
+plot(dkp.pr.abs ~ unemployment)
+abline(lm.out)
+```
+
+... as we can see in the figure here. 
+
+At the same time, we also see a clear violation of the homoskedasticity assumption.
+
+Now, we switch to the Poisson model:
+
+```{r}
+pois.out <- glm(dkp.pr.abs ~ unemployment,family=poisson)
+summary(pois.out)
+
+```
+
+The result shows a positive efefct of the unemployment rate. This effect is however not linear because we use the exponential function. 
+
+
+
+```{r}
+unemployment.values <- seq(min(unemployment),max(unemployment),length=100)
+predict <- coefficients(pois.out)[1] + coefficients(pois.out)[2]*unemployment.values
+predict <- exp(predict)
+
+
+plot(dkp.pr.abs ~ unemployment)
+abline(lm.out)
+lines(unemployment.values, predict,col="red")
+```
+
+This graphic compares the linear regression modeo (black line) with the poitsson model (red line). 
+
+
+
+
+
 ```{r}
 knitr::knit_exit()
 ```
