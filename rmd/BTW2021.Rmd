@@ -117,9 +117,12 @@ company <- sociodem[,grep("Unternehmen.insgesamt",names(sociodem))]
 ## from here election results
 
 eligible <- result21[,grep("Wahlberechtigte Zweitstimmen",names(result21))]
+eligible.17 <- result17[,grep("Wahlberechtigte Zweitstimmen",names(result17))]
 valid <- result21[,grep("Gueltige Stimmen Zweitstimmen",names(result21))]
+valid.17 <- result17[,grep("Gueltige Stimmen Zweitstimmen",names(result17))]
 
 turnout <- valid *100/ eligible
+turnout.17 <- valid.17 *100/ eligible.17
 
 cdu.pr <- result21[,grep("Christlich Demokratische Union Deutschlands Zweitstimmen",names(result21))]
 
@@ -143,11 +146,15 @@ fdp.pr <- fdp.pr *100/valid
 afd.pr <- result21[,grep("Alternative fuer Deutschland Zweitstimmen",names(result21))]
 afd.pr <- afd.pr *100/valid
 
+afd.pr.17 <- result21[,grep("Alternative fuer Deutschland Zweitstimmen",names(result17))]
+afd.pr.17 <- afd.pr.17 *100/valid.17
+
+
 gru.smd <- result21[,grep("BUeNDNIS 90/DIE GRUeNEN Erststimmen",names(result21))]
 gru.smd <- gru.smd *100/valid
 
 gru.smd.17 <- result17[,grep("BUeNDNIS 90/DIE GRUeNEN Erststimmen",names(result17))]
-gru.smd.17 <- gru.smd.17 *100/valid
+gru.smd.17 <- gru.smd.17 *100/valid.17
 
 ```
 
@@ -1446,6 +1453,164 @@ coefficients(summary(fixed.lm.out))[280:284,]
 
 The result is almost identical with the previous one.
 
+
+## Instrumental variable and 2SLS
+
+It has been often said that lower voter turnout benefits AfD since the party is successful in mobilizing their core supporters so that it obtains certain stable amount of votes at different elections. 
+
+To test the hypothesis, we can start with a naive analysis based on the following simple regression model:
+
+
+```{r}
+
+summary(lm( afd.pr ~ turnout ))
+
+
+```
+
+While the result supports the hypothesis above, we can also question whether the turnout variable is endogenous since both the vote share of AfD and voter turnout were generated simultaneously by individual voter decisions. 
+
+For this reason, we employ the instrumental variable estimator. As the instrumental variable, we use  rainfall at the election day. While we can reasonably assume that weather including rainfall is exogenous to the vote decisions, it can affect the turnout level. 
+
+The figure below displays different rainfall in the electoral districts. Accordingly, the rainiest district was Weilheim in Bavaria with 17.8mm. The driest district was Berlin-Steglitz-Zelendorf with 0.04mm. The rainfall of individual districts was reconstructed by using the historical data of 83 weather stations (source: https://www.wetterkontor.de/). Based on the coordinates of the weather stations (source: https://www.dwd.de/) and individual districts (source: https://www.bundeswahlleiter.de), weather in each districts was estimated by interpolating all 83 stations (weighted by inverse squared distance on the coordinate system).
+
+
+
+```{r}
+load("data/BTW21weather.RData")
+
+rain.mm <- dist.weather$rain
+
+knitr::include_graphics("image/BTW21_Rain.png")
+
+
+```
+
+
+While we can reasonably assume the exogeneity of rainfall, we should check its relationship with our independent variable (turnout).
+
+
+
+```{r}
+plot(turnout ~ rain.mm)
+lm.out <- lm(turnout ~ rain.mm )
+abline(lm.out)
+legend("bottomright",paste0("Corr =" , round(cor(turnout ,rain.mm),3)),bty="n")
+```
+
+```{r}
+summary(lm.out)
+```
+
+Interestingly, the above results show a positive effect of rainfall on turnout level. That is, the more rainfall, the higher turnout. While its effect is very small, it is significant at 5% level and F-statistics of the model also signals that the model is superior to the model without the independent variable.
+
+
+Now, we can compute the estimate by using IV estimator:
+
+```{r}
+
+    y <- afd.pr
+    x1 <- turnout
+    z <- rain.mm
+
+
+    slope.est <- cov(y,z)/cov(x1,z)
+    intercept.est <- mean(y) - slope.est*mean(x1)
+
+    resid <- y - (intercept.est + slope.est*x1)
+        
+    sigma2.hat <- sum(resid^2)/(length(y)-2)
+    SSTx <- sum((x1 - mean(x1))^2)
+    R2.xz <- summary(lm(x1 ~ z))$r.squared
+    
+    slope.se <- sqrt(sigma2.hat/(SSTx*R2.xz))
+
+    
+    slope.est
+    slope.se
+    intercept.est
+    
+
+    
+```
+
+Now the point estimate of the effect of turnout on the AfD vote share becomes positive, while its standard error is quite large so that we cannot reject the null hypothesis of no effect.
+
+
+The same result can be also obtained by using a ready made package and its function:
+
+
+```{r}
+library(ivreg)
+
+summary(iv.reg.out <- ivreg( afd.pr ~ turnout | rain.mm))
+
+```
+
+While this package uses the 2sls estimator, the estimates are identical with the results above. That is, the instrumental variable estimator for a single instrumental variable is a special case of 2SLS.
+
+This output also includes some diagnostics. The first one about "weak instruments" test against the null hypothesis that the instrumental variable is not correlated with the endogenous variable. This can be here rejected, which was also obvious from the above regression result.
+
+The second one "Wu-Hausman" test against the null hypothesis that the OLS estimator is consistent, therefore the results are similar to that of the IV estimator. Also this null-hypothesis is rejected, which is also obvious from the very different point estimate here from the first OLS regression.
+
+
+If you like to consider possible heteroskedasticity, here we can also obtain the robust standard errors:
+
+```{r}
+summary(iv.reg.out , vcov =sandwich::sandwich)
+```
+
+Accordingly, we have larger standard errors, while conclusion about the interested hypothesis remains same, that is no clear effect of turnout on the AfD vote share.
+
+
+Now, you may wish to use further weather data as instrumental variables. For example, the maximum and minimum temperature at the election day:
+
+
+```{r,fig.show='hold',fig.align='center',out.width="49%", out.height="20%"}
+
+temp.max <- dist.weather$tempmax
+temp.min <- dist.weather$tempmin
+
+knitr::include_graphics(c("image/BTW21_tempmax.png","image/BTW21_tempmin.png"))
+
+```
+
+We can check the correlation of the relevant variables:
+
+```{r}
+cor.out <- cor(cbind(afd.pr , turnout , rain.mm , temp.min, temp.max))
+colnames(cor.out) <- rownames(cor.out) <- c("afd.pr","turnout","rain.mm","temp.min","temp.max")
+print(cor.out,digits=3)
+
+```
+
+```{r}
+summary(lm(turnout ~ rain.mm + temp.min + temp.max))
+```
+
+Besides to rainfall, maximum temperature seems to have an impact on turnout. 
+
+
+```{r}
+
+summary(iv.reg.out.2 <- ivreg( afd.pr ~ turnout | rain.mm +  temp.max))
+
+```
+
+Interestingly, the result became again reversed and the effect of turnout on the AfD vote becomes negative and significant. Correspondingly, the second diagnostic (Wu-Hausman) does not reject the null hypothesis of the consistency of the OLS estimator. 
+
+In this model, however, we also have the third diagnostic (Sargan), which tests overidentification Restrictions. Here, the null hypothesis is that all instrumental variables are uncorrelated with the error. According to the output above, this null hypothesis is rejected at 5% level, which means at least one of the instrumental variable is not exogenous. Therefore, we should better not take this model and rely on the model with one instrumental variable.
+
+Alternatively, we can now exclude the rainfall variable from the model:
+
+
+```{r}
+
+summary(iv.reg.out.3 <- ivreg( afd.pr ~ turnout |  temp.max))
+
+```
+
+Here, we obtained a very large negative effect of turnout on the AfD vote share. Here, however, due to the first diagnostic, we seem to have a weaker instrument than the rainfall variable. For this reason, it is better to take the rainfall variable as instrument.
 
 
 ```{r}
