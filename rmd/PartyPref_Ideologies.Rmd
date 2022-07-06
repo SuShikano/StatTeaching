@@ -45,7 +45,7 @@ head(long.data,n=10)
 
 ```
 
-The data contains four variables.
+The data contains the following variables.
 
 - id: Identification number of responses
 - wave: survey wave
@@ -1436,7 +1436,238 @@ plot(diff.data$skalo.true ~ diff.data$lr.dist.abs,main="First differences",
 ```
 
 
+## Censored models
 
+
+We have already estimated the following model for many times:
+
+```{r}
+
+
+summary(lm.out.abs <- lm(skalo.true ~ lr.dist.abs,data=long.data))
+
+
+
+plot(long.data$skalo.true ~ long.data$lr.dist.abs,
+     xlab="Ideological Distance (abs)",
+     ylab="Like/Dislike (true value)")
+abline(lm.out.abs)
+
+```
+
+In the very early session, we created the dependent variable under the assumption of random measurement errors from a survey item. If we use the original survey variable, you will obtain the following results:
+
+
+```{r}
+
+summary(lm.out.abs0 <- lm(skalo ~ lr.dist.abs,data=long.data))
+
+
+
+plot(jitter(long.data$skalo) ~ long.data$lr.dist.abs,
+     xlab="Ideological Distance (abs)",
+     ylab="Like/Dislike (true value)")
+abline(lm.out.abs0)
+
+```
+
+The original variable of party evaluation was measured by using a scale from -5 to +5. However, the predicted values for x=8 or larger are outside of the range. 
+
+Now we can conceive that the party evaluation measure is censored. That is, we assume that among those who rated a party with +5, there are some respondents who would have rated the party with +6 or more. And the same can be also assumed for those who rated a party with -5. This idea is behind the censored regression models:
+
+
+```{r}
+library(censReg)
+
+summary(cens.out.abs <- censReg(skalo ~ lr.dist.abs,
+                                left=-5,right=5,
+                                data=long.data))
+
+
+
+```
+
+The result of the censored model can be compared with the simple linear regression model in the following figure:
+
+
+
+```{r}
+
+plot(jitter(long.data$skalo) ~ long.data$lr.dist.abs,
+     xlab="Ideological Distance (abs)",
+     ylab="Like/Dislike (true value)")
+abline(lm.out.abs0)
+abline(coef=cens.out.abs$estimate[1:2],col="red")
+legend("topright",lty=1,
+       col=c("black","red"),
+       legend=c("Linear regression model","Censored model"),
+       bty="n")
+
+```
+
+The difference is in particular clear in the region with a large ideological distance (x>6). While the censored model assumes smaller values behind the measurement of y=-5, the linear regression model takes all the measurement value as face value. Therefore, the latter is more flat to minimize the residuals. In contrast, the slope of the censored model is steeper since the range of the dependent variable does not play a  role.
+
+We can now extend the model with the party-dummy variables to consider the heterogeneity among parties:
+
+
+```{r}
+
+summary(cens.out.dummy <- censReg(skalo ~ lr.dist.abs+as.factor(party),
+                                left=-5,right=5,
+                                data=long.data))
+
+
+```
+
+We can further include the quadratic function:
+
+
+```{r}
+
+summary(cens.out.dummy.quad <- censReg(skalo ~ lr.dist.abs+
+                                  lr.dist.sqr +
+                                  as.factor(party),
+                                left=-5,right=5,
+                                data=long.data))
+
+
+```
+
+Interestingly, the coefficient of the quadratic distance is not significant (at 5%-level). If we compare this model with the last one in the log-likelihood, the improvement is very small and it is not significant at 5%-level.
+
+This result is reasonable if we consider that the linear model with the quadratic term lead to a convex function. This convex function predicted higher values in party evaluation for those with larger ideological distances. This was an artifact due to the censored dependent variable.
+
+Further, we can extend the previous model (without the quadratic distance) by including the fixed effects for respondents:
+
+
+
+```{r}
+
+summary(cens.out.dummy.fe <- censReg(skalo ~ lr.dist.abs+as.factor(party)+
+                                    as.factor(subject),
+                                left=-5,right=5,
+                                data=long.data))
+
+
+```
+
+
+We can check whether we should include the fixed effect by using the likelihood ratio test. First, we check the log-likelihood values of both models:
+
+
+```{r}
+
+print('Model without FE')
+logLik(cens.out.dummy)
+
+
+print('Model with FE')
+logLik(cens.out.dummy.fe)
+
+
+
+```
+
+We calculate the log-likelihood ratio and compare it with the chi-square distribution
+
+
+```{r}
+
+print('log likelihood ratio')
+-2*(as.numeric(logLik(cens.out.dummy)) -
+as.numeric(logLik(cens.out.dummy.fe)) ) 
+
+print('critical value for p=0.95')
+qchisq(0.95,df=
+(attributes(logLik(cens.out.dummy.fe))$df-
+                                            attributes(logLik(cens.out.dummy))$df)
+)
+
+
+```
+
+
+Since the log-likelihood ratio exceeds the critical value, we can reject the null-hypothesis that both models' are at the same level in their performance. In other words, the model with fixed effects has significantly better performance than the model without fixed effects.
+
+Now we can check again the two respondents whose predicted values have already demonstrated in the non-censored linear model (see the section for the panel data analysis):
+
+
+```{r}
+
+par(mfrow=c(1,2))
+for (i.subj in c(120,162)){
+  
+  this.fe <-coef(cens.out.dummy.fe)[grep(as.character(i.subj),
+                                       names(coef(cens.out.dummy.fe)))]
+  
+  plot(long.data$skalo.true ~ long.data$lr.dist.abs,
+     xlab="Close <- -> Distant",ylab="Dislike <-  -> Like",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T),col="grey",
+     main=paste("Subject ID:",i.subj))
+  par(new=T)  
+  plot(long.data$skalo.true[long.data$subject==i.subj] ~
+         long.data$lr.dist.abs[long.data$subject==i.subj],
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T),
+     col="red",pch=19)
+
+predicted.cdu <- coef(cens.out.dummy.fe)[1] + coef(cens.out.dummy.fe)[2]*c(0:10)+  this.fe
+predicted.csu <- coef(cens.out.dummy.fe)[1] + coef(cens.out.dummy.fe)[2]*c(0:10) +coef(cens.out.dummy.fe)[3] + this.fe
+predicted.spd <- coef(cens.out.dummy.fe)[1] + coef(cens.out.dummy.fe)[2]*c(0:10) +coef(cens.out.dummy.fe)[4] + this.fe
+predicted.gru <- coef(cens.out.dummy.fe)[1] + coef(cens.out.dummy.fe)[2]*c(0:10) +coef(cens.out.dummy.fe)[5] + this.fe
+predicted.fdp <- coef(cens.out.dummy.fe)[1] + coef(cens.out.dummy.fe)[2]*c(0:10) +coef(cens.out.dummy.fe)[6] + this.fe
+predicted.afd <- coef(cens.out.dummy.fe)[1] + coef(cens.out.dummy.fe)[2]*c(0:10) +coef(cens.out.dummy.fe)[7] + this.fe
+predicted.lin <- coef(cens.out.dummy.fe)[1] + coef(cens.out.dummy.fe)[2]*c(0:10) +coef(cens.out.dummy.fe)[8] + this.fe
+
+par(new=T)
+plot(predicted.cdu ~ c(0:10),col="orange",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.csu ~ c(0:10),col="cyan",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.spd ~ c(0:10),col="red",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.gru ~ c(0:10),col="green",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.fdp ~ c(0:10),col="yellow",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.afd ~ c(0:10),col="blue4",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+par(new=T)
+plot(predicted.lin ~ c(0:10),col="pink",type="l",
+     ann=F,axes=F,xlab="",ylab="",
+     xlim=range(long.data$lr.dist.abs,na.rm=T),
+     ylim=range(long.data$skalo.true,na.rm=T))
+
+
+legend("topright",col=c("orange","cyan","red","green","yellow","blue4","pink"),
+       lty=c(rep(1,8)),c("CDU","CSU","SPD","Greens","FDP","AfD",
+                        "Linke"),
+       lwd=c(rep(1,8)),
+       bty="n")
+}
+
+
+
+```
 
 
 

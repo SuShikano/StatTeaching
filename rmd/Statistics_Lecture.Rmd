@@ -104,6 +104,7 @@ The linear probability model must contain heteroskedasticity (except $\beta_j=0$
 
 $Var(y|x)=p(x)[1-p(x)]$ with $p(x)=\beta_0 + \beta_1 x_1 +...+\beta_k x_k$.
 
+
 ```{r}
 var.function <- function(p) p*(1-p)
 curve(var.function,0,1,xlab="p(x)",ylab="Var(y)")
@@ -131,6 +132,7 @@ abline(lpm.out)
 
 
 The (heteroskedasticity-) robust standard error is:
+
 
 ```{r}
 var.slope.lpm.het <- sum((exam.anonym$worksheet_submitted - mean(exam.anonym$worksheet_submitted))^2*(lpm.out$residuals^2))/((sum((exam.anonym$worksheet_submitted - mean(exam.anonym$worksheet_submitted))^2))^2)
@@ -192,3 +194,203 @@ summary(wls.lpm.out)
 ```
 
 Here, the result became completely different since we have a significant amount of predicted values outside of $(0,1)$. In such cases, we should better use the heteroskedasticity-robust statistics.
+
+
+## Logit and Probit Models for Binary Response
+
+
+We first regress the dummy variable (pass/fail) on the number of submitted worksheets and the number of persons with whom individual students prepared the exam together: 
+
+
+```{r}
+
+exam.anonym$groupwork[is.na(exam.anonym$groupwork)] <- 0
+
+summary(lpm.out <- lm(passed ~ worksheet_submitted+groupwork,data=exam.anonym))
+
+```
+
+
+
+
+
+
+Now, we estimate the logit model with the same variables:
+
+```{r}
+logit.out <- glm(passed ~ worksheet_submitted+groupwork,
+                 family=binomial(link="logit"),
+                 data=exam.anonym)
+summary(logit.out)
+```
+
+and the probit model:
+
+```{r}
+probit.out <- glm(passed ~ worksheet_submitted+groupwork,
+                 family=binomial(link="probit"),
+                 data=exam.anonym)
+summary(probit.out)
+```
+
+We compare the predicted values based on three different models. Below, we predict the probability of passing the exam for different number of submitted worksheets, while keeping the other variable (groupwork) being the average:
+
+```{r}
+# average values for groupwork
+groupwork.bar <- mean(exam.anonym$groupwork)
+
+# generate different values for the nuber of submitted worksheets between its minimum and maximum value
+worksheets.values <- seq(0,10,length=100)
+
+# predict for different catholic shares based on different model
+## LPM
+predict.lpm <- coefficients(lpm.out)[1] + 
+               coefficients(lpm.out)[2] *worksheets.values + 
+               coefficients(lpm.out)[3] *groupwork.bar 
+
+predict.logit <- coefficients(logit.out)[1] + 
+               coefficients(logit.out)[2] *worksheets.values + 
+               coefficients(logit.out)[3] *groupwork.bar 
+predict.logit <- exp(predict.logit)/(1+exp(predict.logit))
+
+predict.probit <- coefficients(probit.out)[1] + 
+               coefficients(probit.out)[2] *worksheets.values + 
+               coefficients(probit.out)[3] *groupwork.bar 
+predict.probit <- pnorm(predict.probit)
+
+plot(worksheets.values,predict.lpm,ylim=c(0,1),type="l",
+     xlab="Number of worksheets",ylab="Prob(passing the exam)")
+lines(worksheets.values, predict.logit, col="red",lty=2)
+lines(worksheets.values, predict.probit, col="blue",lty=2)
+
+```
+
+
+Now, we change the average value for groupwork (`r groupwork.bar`) variable to the minimum value (0):
+
+```{r}
+# average values for GDP, but the maximum value for abi
+groupwork.min <- 0
+
+
+# predict for different catholic shares based on different model
+## LPM
+predict.lpm <- coefficients(lpm.out)[1] + 
+               coefficients(lpm.out)[2] *worksheets.values + 
+               coefficients(lpm.out)[3] *groupwork.min 
+
+predict.logit <- coefficients(logit.out)[1] + 
+               coefficients(logit.out)[2] *worksheets.values + 
+               coefficients(logit.out)[3] *groupwork.min 
+predict.logit <- exp(predict.logit)/(1+exp(predict.logit))
+
+predict.probit <- coefficients(probit.out)[1] + 
+               coefficients(probit.out)[2] *worksheets.values + 
+               coefficients(probit.out)[3] *groupwork.min 
+predict.probit <- pnorm(predict.probit)
+
+plot(worksheets.values,predict.lpm,ylim=c(0,1),type="l",
+     xlab="Number of worksheets",ylab="Prob(passing the exam)")
+lines(worksheets.values, predict.logit, col="red",lty=2)
+lines(worksheets.values, predict.probit, col="blue",lty=2)
+
+```
+
+It is apparent that the partial effect of the same number of submitted worksheets differ depending on the size of learning group.
+
+
+## 17.1 Logit and Probit Models for Binary Response: LR-test
+
+We focus here only on the probit model:
+
+```{r}
+probit.out <- glm(passed ~ worksheet_submitted+groupwork,
+                 family=binomial(link="probit"),
+                 data=exam.anonym)
+summary(probit.out)
+```
+
+Concerning this model, we test whether all the included independent variables are relevant as a whole to explain the probability to pass the exam. To do this, we can estimate the restricted model without any independent variables:
+
+```{r}
+probit.out.res <- glm(passed ~ 1,family=binomial(link="probit"),
+                      data=exam.anonym)
+summary(probit.out.res)
+```
+
+We can obtain the log likelihood of both models: 
+
+```{r}
+logLik(probit.out)
+logLik(probit.out.res)
+```
+
+... and the likelihood ration, as well:
+
+```{r}
+LR <- as.numeric(2 * (logLik(probit.out) - logLik(probit.out.res)))
+LR
+```
+
+This value follows the chi-square distribution with 2 df:
+
+```{r}
+chisq.func <- function(x) dchisq(x,df=2)
+
+curve(chisq.func,0,60,ylab="Density",xlab="Chi squared")
+abline(v=qchisq(0.95,df=3),lty=2)
+```
+
+At the significance level of 5%, we can reject the Null-hypothesis, "the restricted and unrestricted models do not differ".
+
+
+## 17.3 The Poisson Regression Model
+
+Suppose we are interested in the number of submitted worksheets and investigate its relationship with the points, which the students earned at the method exam in the previous semester. 
+
+
+
+```{r}
+lm.out <- lm(worksheet_submitted ~ method.points,data=exam.anonym)
+summary(lm.out)
+```
+
+There is a positive effect...
+
+```{r}
+plot(jitter(exam.anonym$worksheet_submitted) ~ exam.anonym$method.points,
+     ylab="No of submitted worksheets",xlab="Method Points")
+abline(lm.out)
+```
+
+... as we can see in the figure here. 
+
+At the same time, we also see some potential violation of the zero conditional mean assumption.
+
+Now, we switch to the Poisson model:
+
+```{r}
+pois.out <- glm(worksheet_submitted ~ method.points,data=exam.anonym,family=poisson)
+summary(pois.out)
+
+```
+
+The result shows a positive efefct of the method points. This effect is however not linear because we use the exponential function. 
+
+
+```{r}
+method.values <- seq(min(exam.anonym$method.points,na.rm=T),
+                     max(exam.anonym$method.points,na.rm=T),length=100)
+predict <- coefficients(pois.out)[1] + coefficients(pois.out)[2]*method.values
+predict <- exp(predict)
+
+
+plot(jitter(exam.anonym$worksheet_submitted) ~ exam.anonym$method.points,
+     ylab="No of submitted worksheets",xlab="Method Points")
+abline(lm.out)
+lines(method.values, predict,col="red")
+```
+
+This graphic compares the predicted values of the linear regression model (black line) with those of the Poisson model (red line). 
+
+
