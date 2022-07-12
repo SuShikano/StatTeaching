@@ -32,6 +32,10 @@
 #'                  the vector has the element in the following order:
 #'                  mean_z1, mean_z2, var_z1, var_z2, 
 #'                  cov_x1_z1, cov_x1_z2,...,cov_xj_z1, cov_xj_z2, cov_z1_z2.
+#' @param link.func specifies the link function. Deault is NULL, 
+#'                  which leads to the linear combination. If "logit" the predicted value
+#'                  based on the linear combination is rescaled in the range between 0 and 1
+#'                  by using the inverse logit function.
 #' @return A list including all parameter values and generated datasets. 
 #'         The generated datasets are saved in the list named 'generated.data'.
 # ---------------------------------------------------------------------------- #
@@ -50,7 +54,8 @@ data.generation <- function(sample.size=100,
                             het.delta = c(0.1,0.1,0.1),
                             instv = FALSE,
                             instv.num = NULL,
-                            instv.mu.cov = NULL
+                            instv.mu.cov = NULL,
+                            link.func = NULL
 ){
   
   if (length(x.mu)!=n.iv ) stop("Check the length of x.mu and n.iv.")
@@ -65,10 +70,15 @@ data.generation <- function(sample.size=100,
       stop("Check the length of instv.mu.cov, which has the length of the number of independent variables + 2.")
     }
   }
-  if (instv & instv.num==1) {
-    if (instv.mu.cov[length(instv.mu.cov)]!=0){
-      print("Covariance with the last independent variable is not zero.")
+  if (instv ) {
+    if (instv.num==1) {
+      if (instv.mu.cov[length(instv.mu.cov)]!=0){
+        print("Covariance with the last independent variable is not zero.")
+      }
     }
+  }
+  if (!is.null(link.func) & link.func != "logit"){
+    print("link.func has to be either NULL or logit.")
   } 
   
   library(MASS)
@@ -129,8 +139,13 @@ data.generation <- function(sample.size=100,
     if (binary.y){
       # generating binary y by using Bernoulli 
       y.hat.raw <- y.hat
-      y.hat[y.hat<0] <- 0
-      y.hat[y.hat>1] <- 1
+      if (is.null(link.func)){
+        y.hat[y.hat<0] <- 0
+        y.hat[y.hat>1] <- 1
+      }
+      if (link.func=="logit"){
+        y.hat <- exp(y.hat)/(1 + exp(y.hat))
+      }
       y <- rbinom(n=length(y.hat),1,prob=y.hat)
     }else {
       # In case of heteroskedasticity
@@ -173,7 +188,9 @@ data.generation <- function(sample.size=100,
                    binary.y = binary.y,
                    het = het,
                    instv = instv,
+                   instv.num = instv.num,
                    instv.mu.cov = instv.mu.cov,
+                   link.func = link.func,
                    generated.data = generated.data)
 }
 
