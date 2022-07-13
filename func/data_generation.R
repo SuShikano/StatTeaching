@@ -77,9 +77,12 @@ data.generation <- function(sample.size=100,
       }
     }
   }
-  if (!is.null(link.func) & link.func != "logit"){
-    print("link.func has to be either NULL or logit.")
-  } 
+  if (!is.null(link.func)){
+    if (link.func != "logit"){
+      print("link.func has to be either NULL or logit.")
+    }
+   }
+
   
   library(MASS)
   if (!is.null(random.seed)) set.seed(random.seed)  
@@ -132,6 +135,9 @@ data.generation <- function(sample.size=100,
       }
     }
     
+    if (is.vector(X)){
+      X <- as.matrix(X,ncol=1)
+    }
     colnames(X) <- paste0("X",1:n.iv)
     
     y.hat <- c(cbind(1,X)%*% para)
