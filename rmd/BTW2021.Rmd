@@ -3,7 +3,7 @@ title: 'Example regression analysis (Data: Official Results of the
   2021 German Federal Election)'
 author: "Susumu Shikano"
 date: "Last compiled at `r format(Sys.Date(), '%d. %B %Y')`"
-output: html_document
+output: pdf_document
 ---
 
 
@@ -1769,59 +1769,6 @@ abline(v=qchisq(0.95,df=3),lty=2)
 ```
 
 At the significance level of 5%, we can reject the Null-hypothesis, "the restricted and unrestricted models do not differ".
-
-
-## 17.3 The Poisson Regression Model
-
-Suppose we are interested in the absolute votes which the German Communist Party recieved. 
-
-```{r}
-hist(dkp.pr.abs,br=seq(0,500,by=10))
-```
-
-We first regress it on the unemployment rate:
-
-```{r}
-lm.out <- lm(dkp.pr.abs ~ unemployment)
-summary(lm.out)
-```
-
-There is a positive effect...
-
-```{r}
-plot(dkp.pr.abs ~ unemployment)
-abline(lm.out)
-```
-
-... as we can see in the figure here. 
-
-At the same time, we also see a clear violation of the homoskedasticity assumption.
-
-Now, we switch to the Poisson model:
-
-```{r}
-pois.out <- glm(dkp.pr.abs ~ unemployment,family=poisson)
-summary(pois.out)
-
-```
-
-The result shows a positive efefct of the unemployment rate. This effect is however not linear because we use the exponential function. 
-
-
-
-```{r}
-unemployment.values <- seq(min(unemployment),max(unemployment),length=100)
-predict <- coefficients(pois.out)[1] + coefficients(pois.out)[2]*unemployment.values
-predict <- exp(predict)
-
-
-plot(dkp.pr.abs ~ unemployment)
-abline(lm.out)
-lines(unemployment.values, predict,col="red")
-```
-
-This graphic compares the linear regression modeo (black line) with the poitsson model (red line). 
-
 
 
 
