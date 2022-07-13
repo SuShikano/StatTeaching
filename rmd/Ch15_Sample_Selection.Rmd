@@ -1,0 +1,416 @@
+---
+title: "Chapter 15: Sample Selection Correction"
+author: "Susumu Shikano"
+date: "Last compiled at `r format(Sys.Date(), '%d. %B %Y')`"
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# loading some functions
+#source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/data_generation.R")
+source("../func/data_generation.R")
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/ci_sample_mean.R")
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/naive_var.R")
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/naive_cov.R")
+
+# setting some parameters
+
+num.datasets <- 5000 # number of datasets
+sample.size <- 500
+
+
+n.iv <- 1
+true.slope <- 0.1
+true.intercept <- 0.4
+
+x.mu <- 1
+x.Sigma <- as.matrix(0.5)
+
+true.err.var <- 0.05
+
+```
+
+
+## Simple Regression under the GM-assumptions
+
+We generate `r num.datasets` datasets with n=`r sample.size` under the GM-assumptions. The number of independent variables is `r n.iv`. The true regression line has the intercept of `r true.intercept` and the slope of `r true.slope`. The variance of the error is `r true.err.var`. The independent variables are generated with the mean `r x.mu`, variances  `r diag(x.Sigma)` and covariance `r x.Sigma`.
+
+```{r}
+
+GM.samples <- data.generation(sample.size=sample.size,
+                             n.sim=num.datasets,
+                             n.iv=n.iv,
+                             x.mu=x.mu,
+                             x.Sigma=x.Sigma,
+                             para=c(true.intercept,true.slope),
+                             err.dist = "normal",
+                             err.disp = true.err.var,
+                             instv = TRUE,
+                             instv.num = 1,
+                             instv.mu.cov = c(2, 1.5, 0.5))
+```
+
+Now, we estimate the simple regression model corresponding to the data generating process however with different samples:
+
+* Full sample (n=500)
+* Randomly selected 400 observations (Missing completely at random)
+* Only those observations with $x_1 < 1.75$ (Missing at random)
+* Only those observations with $y < 0.7$ (Missing not at random)
+
+The figure below displays the above selection using the first sample:
+
+
+```{r}
+n.selected <- 400
+
+all.coef <- array(NA,dim=c(num.datasets,3,6))
+all.coef.se <- array(NA,dim=c(num.datasets,2,6))
+
+par(mfrow=c(2,2))
+
+for (i.set in 1:4 ){
+for (i in 1:num.datasets){
+    this.data <- GM.samples$generated.data[[i]]
+
+    if (i.set==1){
+      if (i ==1){
+        plot(this.data$y ~ this.data$X1, pch=19,
+             main="Full sample",
+             xlab="X1",ylab="Y")
+      }
+    }
+    
+    # sample selection
+    ## completely at random
+    if (i.set ==2 ){
+      selected <- sample(1:nrow(this.data),n.selected) 
+
+      if (i ==1){
+        this.col <- rep("grey",nrow(this.data))
+        this.col[selected]  <- "black"
+        this.pch <- rep(1,nrow(this.data))
+        this.pch[selected]  <- 19
+  
+        plot(this.data$y ~ this.data$X1, pch=this.pch,
+             main="Completely at random",
+             xlab="X1",ylab="Y",
+             col=this.col)
+      }
+
+      this.data <- this.data[selected,]
+    }
+    
+    ## at random
+    if (i.set ==3 ){
+      selected <- ifelse(this.data$X1 < 1.75,TRUE,FALSE)
+      
+      if (i ==1){
+        this.col <- rep("grey",nrow(this.data))
+        this.col[selected]  <- "black"
+        this.pch <- rep(1,nrow(this.data))
+        this.pch[selected]  <- 19
+  
+        plot(this.data$y ~ this.data$X1, pch=this.pch,
+             main="At random",
+             xlab="X1",ylab="Y",
+             col=this.col)
+      }
+
+      this.data <- this.data[selected,]
+    }
+    
+    ## not at random
+    if (i.set ==4 ){
+      selected <- ifelse(this.data$y < 0.7,TRUE,FALSE)
+      
+      if (i ==1){
+        this.col <- rep("grey",nrow(this.data))
+        this.col[selected]  <- "black"
+        this.pch <- rep(1,nrow(this.data))
+        this.pch[selected]  <- 19
+  
+        plot(this.data$y ~ this.data$X1, pch=this.pch,
+             main="Not at random",
+             xlab="X1",ylab="Y",
+             col=this.col)
+      }
+
+      this.data <- this.data[selected,]
+
+      this.data <- this.data[selected,]
+    }
+    
+    
+    lm.out <- lm(y ~ X1  ,data=  this.data)
+
+    all.coef[i,1:2,i.set] <- coef(lm.out)
+    all.coef[i,3,i.set] <- summary(lm.out)$sigma
+    all.coef.se[i,c(1:2),i.set] <- coef(summary(lm.out))[,2]
+
+
+}
+}  
+dimnames(all.coef)[[2]] <- c("b0","b1","sigma")
+dimnames(all.coef.se)[[2]] <- c("b0","b1")
+
+```
+
+
+
+Below, you find the distribution of the point estimates:
+
+
+
+```{r}
+
+    x.range <- range(c(all.coef[,"b1",]),na.rm=T)
+    density.out <- density(all.coef[,"b1",1])
+    plot(density.out,
+         main="",xlab=paste0("Regression coefficients for X1"),
+         xlim=x.range,ylim=c(0,max(density.out$y)*1.5))
+    abline(v=mean(all.coef[,"b1",1]))
+    par(new=T)
+    plot(density(all.coef[,"b1",2]),ann=F,xlab="",ylab="",main="",
+         axes=F,
+         xlim=x.range,lty=2,
+         ylim=c(0,max(density.out$y)*1.5))
+    abline(v=mean(all.coef[,"b1",2]),lty=2)
+    par(new=T)
+    plot(density(all.coef[,"b1",3]),ann=F,xlab="",ylab="",main="",
+         axes=F,
+         xlim=x.range,lty=3,
+         ylim=c(0,max(density.out$y)*1.5))
+    abline(v=mean(all.coef[,"b1",3]),lty=3)
+    par(new=T)
+    plot(density(all.coef[,"b1",4]),ann=F,xlab="",ylab="",main="",
+         axes=F,
+         xlim=x.range,lty=4,
+         ylim=c(0,max(density.out$y)*1.5))
+    abline(v=mean(all.coef[,"b1",4]),lty=4)
+    legend("topright",lty=c(1:4),
+           c("Full sample","Completely at random","At random","Not at random"),
+           bty="n")
+    
+    
+
+```
+
+Accordingly, all selection processes but the last one (selection based on y) lead to the unbiased estimates. 
+
+
+## Incidental truncation
+
+
+Now, we observe another sample selection process. We model the sample selection mechanism as follows: $$\hat s = 0.25 + 0.5 x_1 - 0.3 z + \nu$$ with $$\nu \sim N(0,0.04) + u$$ and $s = 1$ (selected) for $\hat s \geq 0$ and  $s = 1$ (not selected) otherwise. 
+
+The figure below displays selected and not selected observations based on a sample data:
+
+
+```{r warning=FALSE}
+
+
+for (i in 1:num.datasets){
+    this.data <- this.full.data <- GM.samples$generated.data[[i]]
+
+
+    # selection model
+    nu.err <- rnorm(nrow(this.data),mean=0,sd=0.2) + 0.5*this.data$error
+    
+    s.hat <- 0.25 + 0.5*this.data$X1 - 0.3 * this.data$IV + nu.err
+
+    selected <- ifelse(s.hat >= 0,TRUE,FALSE)
+
+    if (i ==1){
+    this.col <- rep("grey",nrow(this.data))
+    this.col[selected]  <- "black"
+    this.pch <- rep(1,nrow(this.data))
+    this.pch[selected]  <- 19
+  
+    plot(this.data$y ~ this.data$X1, pch=this.pch,
+             main="Incidental truncation",
+             xlab="X1",ylab="Y",
+             col=this.col)
+    }
+
+    this.data <- this.data[selected,]
+    
+
+    lm.out <- lm(y ~ X1  ,data=  this.data)
+
+    all.coef[i,1:2,5] <- coef(lm.out)
+    all.coef[i,3,5] <- summary(lm.out)$sigma
+    all.coef.se[i,c(1:2),5] <- coef(summary(lm.out))[,2]
+
+    
+    # sample selection correction
+    
+    prob.out <- glm(selected ~ this.full.data$X1 + this.full.data$IV,
+                    family=binomial(link="probit"))
+    
+    y.star <-prob.out$linear.predictors 
+    imr.1 <-  dnorm(-y.star)/(1-pnorm(-y.star))
+    imr.1 <- imr.1[selected]
+    
+    section.model.out <- lm(y ~ X1 + imr.1  ,data=  this.data)
+
+    all.coef[i,1:2,6] <- coef(section.model.out)[1:2]
+    all.coef[i,3,6] <- summary(section.model.out)$sigma
+    all.coef.se[i,c(1:2),6] <- coef(summary(section.model.out))[1:2,2]
+
+}
+
+
+```
+
+
+
+Using the selected samples, we estimate the same simple regression model above. The figure below displays the estimate distribution in red:
+
+
+
+```{r}
+
+    x.range <- range(c(all.coef[,"b1",]),na.rm=T)
+    density.out <- density(all.coef[,"b1",1])
+    plot(density.out,
+         main="",xlab=paste0("Regression coefficients for X1"),
+         xlim=x.range,ylim=c(0,max(density.out$y)*1.5))
+    abline(v=mean(all.coef[,"b1",1]))
+    par(new=T)
+    plot(density(all.coef[,"b1",2]),ann=F,xlab="",ylab="",main="",
+         axes=F,
+         xlim=x.range,lty=2,
+         ylim=c(0,max(density.out$y)*1.5))
+    abline(v=mean(all.coef[,"b1",2]),lty=2)
+    par(new=T)
+    plot(density(all.coef[,"b1",3]),ann=F,xlab="",ylab="",main="",
+         axes=F,
+         xlim=x.range,lty=3,
+         ylim=c(0,max(density.out$y)*1.5))
+    abline(v=mean(all.coef[,"b1",3]),lty=3)
+    par(new=T)
+    plot(density(all.coef[,"b1",4]),ann=F,xlab="",ylab="",main="",
+         axes=F,
+         xlim=x.range,lty=4,
+         ylim=c(0,max(density.out$y)*1.5))
+    abline(v=mean(all.coef[,"b1",4]),lty=4)
+    par(new=T)
+    plot(density(all.coef[,"b1",5]),ann=F,xlab="",ylab="",main="",
+         axes=F,col="red",
+         xlim=x.range,lty=5,
+         ylim=c(0,max(density.out$y)*1.5))
+    abline(v=mean(all.coef[,"b1",5]),lty=5,col="red")
+    legend("topright",lty=c(1:5),
+           c("Full sample","Completely at random","At random","Not at random",
+             "Incidental Trunc"),
+           col=c(rep("black",4),"red"),
+           bty="n")
+    
+    
+
+```
+
+
+It is obvious that the estimates are biased. This is because we have the error term $\nu$ in the selection process which correlates with $u$, the error of the main regression model. 
+
+If it is known what variables are the part of the selection mechanism ($x_1$ and $z$ in the above equation), we can utilize the Heckit method, which are presented below.
+
+First, we model the selection by $x_1$ and $z$ (in the code $IV$) using the probit model:
+
+```{r}
+
+prob.out <- glm(selected ~ this.full.data$X1 + this.full.data$IV,
+                    family=binomial(link="probit"))
+summary(prob.out)
+```
+
+Based on the result, we obtain the linear predictors: $$y^* = \gamma_0 + \gamma_1 x_1 + \gamma_2 z$$
+
+This predictors are rescaled by using the inverse Mills ratio. 
+
+```{r}
+y.star <-prob.out$linear.predictors 
+imr.1 <-  dnorm(-y.star)/(1-pnorm(-y.star))
+imr.1 <- imr.1[selected]
+
+plot(imr.1 ~ y.star[selected],xlab="y.star",ylab="Inverse Mills ratio")
+    
+```
+
+Now, we can regress y on $x_1$ and the inverse Mills ratio to obtain the corrected estimate for $\beta_1$. Note that we use only the selected samples in this regression:
+
+
+```{r}
+
+section.model.out <- lm(y ~ X1 + imr.1  ,data=  this.data)
+
+summary(section.model.out)
+
+```
+
+
+If one compares the result with the naive simple regression model, $\hat \beta_1$ is significantly different:
+
+```{r}
+
+summary(lm.out)
+
+```
+
+The estimates based on the Heckit method are presented in blue in the digure below: 
+
+
+```{r}
+
+    x.range <- range(c(all.coef[,"b1",]),na.rm=T)
+    density.out <- density(all.coef[,"b1",1])
+    plot(density.out,
+         main="",xlab=paste0("Regression coefficients for X1"),
+         xlim=x.range,ylim=c(0,max(density.out$y)*1.5))
+    abline(v=mean(all.coef[,"b1",1]))
+    par(new=T)
+    plot(density(all.coef[,"b1",2]),ann=F,xlab="",ylab="",main="",
+         axes=F,
+         xlim=x.range,lty=2,
+         ylim=c(0,max(density.out$y)*1.5))
+    abline(v=mean(all.coef[,"b1",2]),lty=2)
+    par(new=T)
+    plot(density(all.coef[,"b1",3]),ann=F,xlab="",ylab="",main="",
+         axes=F,
+         xlim=x.range,lty=3,
+         ylim=c(0,max(density.out$y)*1.5))
+    abline(v=mean(all.coef[,"b1",3]),lty=3)
+    par(new=T)
+    plot(density(all.coef[,"b1",4]),ann=F,xlab="",ylab="",main="",
+         axes=F,
+         xlim=x.range,lty=4,
+         ylim=c(0,max(density.out$y)*1.5))
+    abline(v=mean(all.coef[,"b1",4]),lty=4)
+    par(new=T)
+    plot(density(all.coef[,"b1",5]),ann=F,xlab="",ylab="",main="",
+         axes=F,col="red",
+         xlim=x.range,lty=5,
+         ylim=c(0,max(density.out$y)*1.5))
+    abline(v=mean(all.coef[,"b1",5]),lty=5,col="red")
+    par(new=T)
+    plot(density(all.coef[,"b1",6]),ann=F,xlab="",ylab="",main="",
+         axes=F,col="blue",
+         xlim=x.range,lty=6,
+         ylim=c(0,max(density.out$y)*1.5))
+    abline(v=mean(all.coef[,"b1",6]),lty=6,col="blue")
+    legend("topright",lty=c(1:6),
+           c("Full sample","Completely at random","At random","Not at random",
+             "Incidental Trunc","Heckit"),
+           col=c(rep("black",4),"red","blue"),
+           bty="n")
+    
+    
+
+```
+
+The distribution shows that the Heckit method successfully correct the estimates and made them unbiased.
+
