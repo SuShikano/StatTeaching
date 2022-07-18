@@ -11,8 +11,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 
 # loading some functions
-#source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/data_generation.R")
-source("../func/data_generation.R")
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/data_generation.R")
 source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/ci_sample_mean.R")
 source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/cond_mean_plot.R")
 source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/naive_var.R")

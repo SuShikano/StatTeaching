@@ -1,5 +1,5 @@
 ---
-title: "Chapter 15: Sample Selection Correction"
+title: "Chapter 17: Sample Selection Correction"
 author: "Susumu Shikano"
 date: "Last compiled at `r format(Sys.Date(), '%d. %B %Y')`"
 output: html_document
@@ -11,8 +11,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 
 # loading some functions
-#source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/data_generation.R")
-source("../func/data_generation.R")
+source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/data_generation.R")
 source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/ci_sample_mean.R")
 source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/naive_var.R")
 source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/naive_cov.R")
