@@ -1,5 +1,5 @@
 ---
-title: "Linear Probability Modells"
+title: "Example Regression Analysis: Statistics Lecture Exam Data"
 author: "Susumu Shikano"
 date: "Last compiled at `r format(Sys.Date(), '%d. %B %Y')`"
 output: html_document
