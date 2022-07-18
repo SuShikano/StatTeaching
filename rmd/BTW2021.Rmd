@@ -3,7 +3,7 @@ title: 'Example regression analysis (Data: Official Results of the
   2021 German Federal Election)'
 author: "Susumu Shikano"
 date: "Last compiled at `r format(Sys.Date(), '%d. %B %Y')`"
-output: pdf_document
+output: html_document
 ---
 
 
