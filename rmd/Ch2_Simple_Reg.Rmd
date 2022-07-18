@@ -10,14 +10,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # loading some functions
 source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/data_generation.R")
-
 source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/ci_sample_mean.R")
-
 source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/naive_var.R")
-
 source("https://raw.githubusercontent.com/SuShikano/StatTeaching/main/func/naive_cov.R")
-
-
 
 # setting some parameters
 
