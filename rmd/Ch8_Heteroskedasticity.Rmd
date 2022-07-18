@@ -74,7 +74,7 @@ samples.srm.het <- data.generation(sample.size=sample.size,
 ```
 
 
-Another set of samples is generated with the same parameters above, but without the homoskedasticity assumption. Here, the error variance is assumed to be: $$var(u|x_1) = \sigma^2 \exp(\delta_0 + \delta_1 x_1)$$ with $\delta_0=$`r het.delta[1]` and $\delta_1=$`r het.delta[2]`.
+Another set of samples is generated with the same parameters above, but without the homoskedasticity assumption. Here, the error variance is assumed to be: $$var(u|x_1) = \sigma^2 \exp(\delta_0 + \delta_1 x_1)$$ with $$\delta_0= `r het.delta[1]`$$ and $$\delta_1= `r het.delta[2]`$$.
 
 
 Below, we can see a sample data generated under different assumptions. The joint distribution in the right-hand side panel demonstrates an obvious heteroskedasticity.
@@ -310,7 +310,7 @@ samples.srm.het <- data.generation(sample.size=sample.size,
 ```
 
 
-Another set of samples is generated with the same parameters above, but without the homoskedasticity assumption. Here, the error variance is assumed to be: $$var(u|x_1) = \sigma^2 \exp(\delta_0 + \delta_1 x_1+ \delta_2 x_2)$$ with $\delta_0=$`r het.delta[1]` and $\delta_1=$`r het.delta[2]` and $\delta_2=$`r het.delta[3]` .
+Another set of samples is generated with the same parameters above, but without the homoskedasticity assumption. Here, the error variance is assumed to be: $$var(u|x_1) = \sigma^2 \exp(\delta_0 + \delta_1 x_1+ \delta_2 x_2)$$ with $$\delta_0=`r het.delta[1]`$$ and $$\delta_1=`r het.delta[2]`$$ and $$\delta_2=`r het.delta[3]` $$.
 
 
 
