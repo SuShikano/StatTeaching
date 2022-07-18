@@ -148,9 +148,10 @@ data.generation <- function(sample.size=100,
       if (is.null(link.func)){
         y.hat[y.hat<0] <- 0
         y.hat[y.hat>1] <- 1
-      }
-      if (link.func=="logit"){
-        y.hat <- exp(y.hat)/(1 + exp(y.hat))
+      }else{
+        if (link.func=="logit"){
+          y.hat <- exp(y.hat)/(1 + exp(y.hat))
+        }
       }
       y <- rbinom(n=length(y.hat),1,prob=y.hat)
     }else {
